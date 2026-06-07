@@ -169,11 +169,13 @@ This page gets a working computer running in about five minutes.
 
 ## 1. Place and power the computer
 
-The **Computer** is a full block. Place it down, then give it power on its **bottom** face — it runs on
+The **Computer** is a full block with a **cogwheel running horizontally through its centre**, exactly
+like Create's Encased Cogwheel. Place it down, then give it power through that cogwheel — it runs on
 either of Create's two power types:
 
-- **Rotation (recommended, free):** point a spinning shaft into the **bottom** face. Any non-zero RPM
-  works as long as the network isn't overstressed.
+- **Rotation (recommended, free):** drive the central cogwheel. Mesh another **cogwheel** with it from
+  the side, or run a **shaft** into either end of its horizontal axis. Any non-zero RPM works as long as
+  the network isn't overstressed.
 - **Electricity (Forge Energy):** connect an FE cable/source from a mod that provides it. The computer
   has an internal battery and sips a little FE each tick while running.
 
@@ -253,7 +255,7 @@ The computer accepts **either** power type; whichever is present runs it:
 
 | Source | How | Notes |
 |---|---|---|
-| **Rotation (Create)** | Spinning shaft into the **bottom** face | Free to run. Needs non-zero RPM and a non-overstressed network. Imposes a small stress load. |
+| **Rotation (Create)** | Drive the **central cogwheel** — mesh a cogwheel from the side or run a shaft into either end of its horizontal axis | Free to run. Needs non-zero RPM and a non-overstressed network. Imposes a small stress load. |
 | **Forge Energy (FE)** | FE from a cable/generator into the block | Uses an internal FE battery; drains a little FE per tick, but **only when there's no rotation** (rotation is preferred and free). |
 
 `isPowered = has rotation OR has stored FE`. If neither is present, the computer is **OFF**.
@@ -861,8 +863,8 @@ end
 # Troubleshooting & FAQ
 
 ## My program does nothing / state is OFF
-The computer has no power. Put a spinning shaft into the **bottom** face, or supply Forge Energy. Check
-the state shown on the screen.
+The computer has no power. Drive its central cogwheel (mesh a cogwheel or run a shaft into its
+horizontal axis), or supply Forge Energy. Check the state shown on the screen.
 
 ## It shows FINISHED immediately
 Your program ran to the end with no loop. Wrap the logic in `while true do ... sleep(...) end`.
@@ -920,7 +922,7 @@ DATA FLOW
   world -> [Sensor] -> channel -> [Computer] -> channel -> [Receiver] -> world
 
 BLOCKS
-  Computer  full block, powered from bottom (shaft) or FE; flash Lua onto it
+  Computer  full block, powered by a cogwheel through its centre (or FE); flash Lua onto it
   Sensor    thin plate on a block face; publishes that block's full reading table
   Receiver  thin plate; turns a channel value into redstone (num->0-15, true->15)
 

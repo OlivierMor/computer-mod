@@ -1,5 +1,6 @@
 {
   "variants": {
-    "": { "model": "computermod:block/computer" }
+    "axis=x": { "model": "computermod:block/computer", "x": 90, "y": 90 },
+    "axis=z": { "model": "computermod:block/computer", "x": 90, "y": 180 }
   }
 }

@@ -1,6 +1,9 @@
 {
-  "parent": "minecraft:block/cube_all",
+  "parent": "create:block/encased_cogwheel/block",
   "textures": {
-    "all": "computermod:block/computer"
+    "1": "computermod:block/computer_socket",
+    "casing": "computermod:block/computer_casing",
+    "particle": "computermod:block/computer_casing",
+    "side": "computermod:block/computer_encased_side"
   }
 }

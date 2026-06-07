@@ -50,7 +50,8 @@ A microcontroller block for the Minecraft mod **Create** (NeoForge 1.21.1):
 - You **flash** it with a Lua program (stored permanently in the block).
 - When **powered**, it **boots** and runs the program from the top.
 - When it loses power, it **halts** and variables (RAM) are wiped. Re-powering boots it fresh.
-- Power: a spinning Create shaft on the **bottom** face, and/or Forge Energy (FE). Either works.
+- Power: a **cogwheel running horizontally through its centre** (like Create's Encased Cogwheel) — mesh
+  a cogwheel from the side or run a shaft into either end of its axis — and/or Forge Energy (FE).
 - The program runs **continuously on its own thread** — `while true do ... end` loops are fine.
 - Run states (status bar): `OFF`, `RUNNING`, `FINISHED` (program returned), `ERROR` (crashed).
 
