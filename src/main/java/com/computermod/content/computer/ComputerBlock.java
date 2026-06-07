@@ -5,9 +5,11 @@ import com.simibubi.create.content.kinetics.base.HorizontalAxisKineticBlock;
 import com.simibubi.create.content.kinetics.simpleRelays.ICogWheel;
 import com.simibubi.create.foundation.block.IBE;
 
+import net.minecraft.core.Direction.Axis;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.context.BlockPlaceContext;
 import net.minecraft.world.level.Level;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.block.entity.BlockEntity;
@@ -26,6 +28,18 @@ public class ComputerBlock extends HorizontalAxisKineticBlock implements IBE<Com
 
 	public ComputerBlock(Properties properties) {
 		super(properties);
+	}
+
+	@Override
+	public BlockState getStateForPlacement(BlockPlaceContext context) {
+		// Prefer aligning to an adjacent kinetic source if one is present...
+		Axis preferred = getPreferredHorizontalAxis(context);
+		if (preferred != null)
+			return defaultBlockState().setValue(HORIZONTAL_AXIS, preferred);
+		// ...otherwise put the cog's axle along the player's facing, so the flat face points at them
+		// and the cogwheel runs side-to-side through the block (like a Mechanical Crafter), rather
+		// than the axle pointing across their view with the cog facing them.
+		return defaultBlockState().setValue(HORIZONTAL_AXIS, context.getHorizontalDirection().getAxis());
 	}
 
 	@Override

@@ -1,6 +1,6 @@
 {
   "parent": "create:block/encased_cogwheel/item",
-  "render_type": "minecraft:cutout_mipped",
+  "render_type": "minecraft:translucent",
   "textures": {
     "1": "computermod:block/computer_socket",
     "casing": "computermod:block/computer_casing",
