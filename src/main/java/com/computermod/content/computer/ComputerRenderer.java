@@ -56,14 +56,27 @@ public class ComputerRenderer extends KineticBlockEntityRenderer<ComputerBlockEn
 		kineticRotationTransform(cog, be, axis, angle, cogLight);
 		cog.renderInto(ms, buffer.getBuffer(RenderType.solid()));
 
-		// A half-shaft sticking out of each connected end so a driving shaft looks plugged in.
+		// A half-shaft sticking out of each end, but ONLY when something is actually plugged into that
+		// end coaxially. The block reports a shaft towards both axis ends unconditionally (so it can be
+		// driven from either side), which would otherwise leave phantom stubs poking through the front
+		// and back faces with nothing attached.
 		for (Direction d : Iterate.directionsInAxis(axis)) {
-			if (!def.hasShaftTowards(be.getLevel(), be.getBlockPos(), state, d))
+			if (!isShaftConnected(be.getLevel(), be.getBlockPos(), d))
 				continue;
 			SuperByteBuffer shaft = CachedBuffers.partialFacing(AllPartialModels.SHAFT_HALF, state, d);
 			kineticRotationTransform(shaft, be, axis, angle, cogLight);
 			shaft.renderInto(ms, buffer.getBuffer(RenderType.solid()));
 		}
+	}
+
+	/** True when the neighbour on side {@code d} is a kinetic block presenting a shaft back towards us. */
+	private static boolean isShaftConnected(Level level, BlockPos pos, Direction d) {
+		if (level == null)
+			return false;
+		BlockPos neighbour = pos.relative(d);
+		BlockState ns = level.getBlockState(neighbour);
+		return ns.getBlock() instanceof IRotate other
+			&& other.hasShaftTowards(level, neighbour, ns, d.getOpposite());
 	}
 
 	/**
