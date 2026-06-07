@@ -311,8 +311,10 @@ is removed, the Sensor pops off and drops. It can mount on any side (walls, floo
 
 ## What it does
 
-Every couple of ticks the Sensor scans the block it's attached to and **publishes the complete readings
-table** onto its channel. Right-click the Sensor to set the **Channel** name; that's the only setting.
+The Sensor scans the block it's attached to **every tick** and **publishes the complete readings table
+the instant anything changes** — add an item, change a fluid level, flip a blockstate, and it transmits
+that **same tick** with no polling delay. (If nothing changed, it stays quiet; the channel already holds
+the latest value.) Right-click the Sensor to set the **Channel** name; that's the only setting.
 
 > Because it always publishes the **whole table**, `channel("name")` from a sensor is always a Lua
 > **table** — you index into it (e.g. `channel("name").item_count`). It never publishes a bare value.

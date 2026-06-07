@@ -25,8 +25,8 @@ public class ComputerScreen extends AbstractContainerScreen<ComputerMenu> {
 
 	private enum Tab { CODE, CONSOLE }
 
-	/** External documentation link. Empty until the wiki exists. */
-	private static final String WIKI_URL = "";
+	/** External documentation link. */
+	private static final String WIKI_URL = "https://oliviermor.github.io/computer-mod/";
 
 	private static final int MAX_SOURCE_CHARS = 60_000;
 	private static final int BG = 0xF00B0E13;

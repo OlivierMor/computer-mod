@@ -27,13 +27,13 @@ import org.jetbrains.annotations.Nullable;
 
 /**
  * Sensor / transmitter: reads the block it faces via the universal {@link ReadingStack} and publishes
- * the whole reading table onto a named channel every couple of ticks. The GUI shows, live, exactly
- * what the sensor currently sees.
+ * the whole reading table onto a named channel <em>the moment it changes</em> — it scans every tick and
+ * transmits immediately (no fixed interval), so e.g. an item being added goes out that same tick. The
+ * GUI shows, live, exactly what the sensor currently sees.
  */
 public class SensorBlockEntity extends SmartBlockEntity implements MenuProvider, ChannelConfigurable {
 
-	private static final int PUBLISH_INTERVAL = 2;
-	/** How often (in ticks) we refresh + sync the readings tree shown in the GUI. */
+	/** How often (in ticks) we refresh + sync the readings tree shown in the GUI (a client packet). */
 	private static final int DISPLAY_INTERVAL = 10;
 	/** Safety caps so a huge modded block-entity NBT can't bloat the sync packet. */
 	private static final int MAX_NODES = 256;
@@ -43,8 +43,9 @@ public class SensorBlockEntity extends SmartBlockEntity implements MenuProvider,
 	public record Node(int depth, String key, String value, boolean container) {}
 
 	private String channel = "";
-	private int timer = 0;
 	private int displayTimer = 0;
+	/** Last table published to the channel; used to publish only when something actually changed. */
+	private Map<String, Object> lastPublished = null;
 
 	private final List<Node> readings = new ArrayList<>();
 	private List<Node> lastSyncedReadings = null;
@@ -64,24 +65,25 @@ public class SensorBlockEntity extends SmartBlockEntity implements MenuProvider,
 
 		Direction facing = SensorBlock.getFacing(getBlockState());
 		BlockPos target = worldPosition.relative(facing);
+		Map<String, Object> data = ReadingStack.scan(level, target);
 
-		if (++timer >= PUBLISH_INTERVAL) {
-			timer = 0;
-			Map<String, Object> data = ReadingStack.scan(level, target);
-			if (!channel.isEmpty())
-				ChannelBus.get().publish(channel, data);
+		// Transmit the instant the readings change — no fixed interval, so changes go out the same tick.
+		if (!channel.isEmpty() && !data.equals(lastPublished)) {
+			ChannelBus.get().publish(channel, data);
+			lastPublished = data;
+		}
 
-			if (++displayTimer >= DISPLAY_INTERVAL) {
-				displayTimer = 0;
-				List<Node> nodes = new ArrayList<>();
-				for (Map.Entry<String, Object> entry : data.entrySet())
-					flatten(entry.getKey(), entry.getValue(), 0, nodes);
-				if (!nodes.equals(lastSyncedReadings)) {
-					readings.clear();
-					readings.addAll(nodes);
-					lastSyncedReadings = new ArrayList<>(nodes);
-					sendData();
-				}
+		// Refresh the GUI tree at a gentler rate (it's a client packet; eyes don't need every tick).
+		if (++displayTimer >= DISPLAY_INTERVAL) {
+			displayTimer = 0;
+			List<Node> nodes = new ArrayList<>();
+			for (Map.Entry<String, Object> entry : data.entrySet())
+				flatten(entry.getKey(), entry.getValue(), 0, nodes);
+			if (!nodes.equals(lastSyncedReadings)) {
+				readings.clear();
+				readings.addAll(nodes);
+				lastSyncedReadings = new ArrayList<>(nodes);
+				sendData();
 			}
 		}
 	}
@@ -132,6 +134,7 @@ public class SensorBlockEntity extends SmartBlockEntity implements MenuProvider,
 		this.channel = newChannel == null ? "" : newChannel;
 		if (!previous.isEmpty() && !previous.equals(channel))
 			ChannelBus.get().publish(previous, null); // release the old channel
+		lastPublished = null; // force an immediate re-publish to the (new) channel next tick
 		setChanged();
 		sendData();
 	}

@@ -24,8 +24,8 @@ import net.neoforged.neoforge.network.PacketDistributor;
 /** Configuration GUI for the sensor and receiver blocks. */
 public class ChannelScreen extends AbstractContainerScreen<ChannelMenu> {
 
-	/** Wiki landing page; leave empty to disable the button until a wiki exists. */
-	private static final String WIKI_URL = "";
+	/** Wiki landing page. */
+	private static final String WIKI_URL = "https://oliviermor.github.io/computer-mod/";
 
 	private static final int LINE_HEIGHT = 11;
 	private static final int INDENT = 10;

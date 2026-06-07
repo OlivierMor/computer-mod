@@ -169,6 +169,10 @@ Place it **facing a block** (placed against the block you want to read). Right-c
 a table — index into it (e.g. `channel("c").item_count`). The GUI lists every field it currently
 sees with its live value, so you know exactly what's available before writing code.
 
+It transmits **immediately, the same tick the block changes** (an item added, a fluid level moved, a
+state flipped) — there is no polling delay. If nothing changed it stays quiet and the channel keeps
+its latest value.
+
 > To turn a sensor reading into redstone, read it in the computer, decide, and `emit` a number/bool
 > on another channel that a **Receiver** listens to. Wiring a Receiver straight to a sensor channel
 > gives it a table, which reads as 0.
