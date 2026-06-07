@@ -1,0 +1,12 @@
+{
+  "itemGroup.computermod": "Computer Mod",
+  "block.computermod.computer": "Computer",
+  "block.computermod.sensor": "Sensor",
+  "block.computermod.receiver": "Receiver",
+
+  "computermod.configuration.title": "Computer Mod Configs",
+  "computermod.configuration.section.computermod.common.toml": "Computer Mod Configs",
+  "computermod.configuration.section.computermod.common.toml.title": "Computer Mod Configs",
+  "computermod.configuration.maxOpsPerTick": "Max Instructions Per Tick",
+  "computermod.configuration.minRpm": "Minimum RPM To Run"
+}

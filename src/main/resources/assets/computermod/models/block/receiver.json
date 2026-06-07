@@ -1,0 +1,21 @@
+{
+  "parent": "minecraft:block/block",
+  "textures": {
+    "all": "computermod:block/receiver",
+    "particle": "computermod:block/receiver"
+  },
+  "elements": [
+    {
+      "from": [2, 2, 0],
+      "to": [14, 14, 4],
+      "faces": {
+        "north": { "uv": [2, 2, 14, 14], "texture": "#all" },
+        "south": { "uv": [2, 2, 14, 14], "texture": "#all" },
+        "east":  { "uv": [0, 2, 4, 14], "texture": "#all" },
+        "west":  { "uv": [0, 2, 4, 14], "texture": "#all" },
+        "up":    { "uv": [2, 0, 14, 4], "texture": "#all" },
+        "down":  { "uv": [2, 0, 14, 4], "texture": "#all" }
+      }
+    }
+  ]
+}

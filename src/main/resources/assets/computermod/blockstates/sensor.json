@@ -1,0 +1,10 @@
+{
+  "variants": {
+    "facing=north": { "model": "computermod:block/sensor" },
+    "facing=east":  { "model": "computermod:block/sensor", "y": 90 },
+    "facing=south": { "model": "computermod:block/sensor", "y": 180 },
+    "facing=west":  { "model": "computermod:block/sensor", "y": 270 },
+    "facing=up":    { "model": "computermod:block/sensor", "x": 270 },
+    "facing=down":  { "model": "computermod:block/sensor", "x": 90 }
+  }
+}
