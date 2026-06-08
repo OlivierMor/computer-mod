@@ -34,12 +34,12 @@ public abstract class WallChannelBlock<T extends BlockEntity> extends Block impl
 	public static final DirectionProperty FACING = BlockStateProperties.FACING;
 
 	private static final int DEPTH = 4; // plate thickness in pixels
-	private static final VoxelShape DOWN = Block.box(2, 0, 2, 14, DEPTH, 14);
-	private static final VoxelShape UP = Block.box(2, 16 - DEPTH, 2, 14, 16, 14);
-	private static final VoxelShape NORTH = Block.box(2, 2, 0, 14, 14, DEPTH);
-	private static final VoxelShape SOUTH = Block.box(2, 2, 16 - DEPTH, 14, 14, 16);
-	private static final VoxelShape WEST = Block.box(0, 2, 2, DEPTH, 14, 14);
-	private static final VoxelShape EAST = Block.box(16 - DEPTH, 2, 2, 16, 14, 14);
+	private static final VoxelShape DOWN = Block.box(3, 0, 3, 13, DEPTH, 13);
+	private static final VoxelShape UP = Block.box(3, 16 - DEPTH, 3, 13, 16, 13);
+	private static final VoxelShape NORTH = Block.box(3, 3, 0, 13, 13, DEPTH);
+	private static final VoxelShape SOUTH = Block.box(3, 3, 16 - DEPTH, 13, 13, 16);
+	private static final VoxelShape WEST = Block.box(0, 3, 3, DEPTH, 13, 13);
+	private static final VoxelShape EAST = Block.box(16 - DEPTH, 3, 3, 16, 13, 13);
 
 	protected WallChannelBlock(Properties properties) {
 		super(properties);

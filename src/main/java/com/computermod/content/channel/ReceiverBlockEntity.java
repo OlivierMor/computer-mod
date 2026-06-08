@@ -14,6 +14,7 @@ import net.minecraft.world.MenuProvider;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.AbstractContainerMenu;
+import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraft.world.level.block.state.BlockState;
 
@@ -44,6 +45,14 @@ public class ReceiverBlockEntity extends SmartBlockEntity implements MenuProvide
 		if (target != output) {
 			output = target;
 			setChanged();
+			// Reflect the strength in the blockstate so the LED lights up and the block emits light
+			// proportional to the signal (both LIT and GLOW sync to the client automatically).
+			BlockState state = getBlockState();
+			if (state.getBlock() instanceof ReceiverBlock) {
+				BlockState lit = state.setValue(ReceiverBlock.LIT, output > 0).setValue(ReceiverBlock.GLOW, output);
+				if (lit != state)
+					level.setBlock(worldPosition, lit, Block.UPDATE_ALL);
+			}
 			level.updateNeighborsAt(worldPosition, getBlockState().getBlock());
 			sendData();
 		}

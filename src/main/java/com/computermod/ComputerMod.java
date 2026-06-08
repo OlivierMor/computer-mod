@@ -7,6 +7,7 @@ import com.computermod.network.ModNetwork;
 import com.computermod.registry.ModBlockEntities;
 import com.computermod.registry.ModBlocks;
 import com.computermod.registry.ModCreativeTabs;
+import com.computermod.registry.ModDataComponents;
 import com.computermod.registry.ModItems;
 import com.computermod.registry.ModMenus;
 import com.mojang.logging.LogUtils;
@@ -30,6 +31,7 @@ public class ComputerMod {
 		ModBlockEntities.BLOCK_ENTITIES.register(modEventBus);
 		ModMenus.MENUS.register(modEventBus);
 		ModCreativeTabs.TABS.register(modEventBus);
+		ModDataComponents.COMPONENTS.register(modEventBus);
 
 		modEventBus.addListener(ModNetwork::register);
 		modEventBus.addListener(ComputerBlockEntity::registerCapabilities);

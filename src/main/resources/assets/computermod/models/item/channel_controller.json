@@ -1,0 +1,62 @@
+{
+  "parent": "minecraft:block/block",
+  "gui_light": "front",
+  "textures": {
+    "kbd": "computermod:item/channel_controller",
+    "particle": "computermod:item/channel_controller"
+  },
+  "elements": [
+    {
+      "name": "keyboard",
+      "from": [1, 0, 3],
+      "to": [15, 2, 13],
+      "faces": {
+        "up":    {"uv": [0, 0, 16, 16], "texture": "#kbd"},
+        "down":  {"uv": [0, 3, 16, 4], "texture": "#kbd"},
+        "north": {"uv": [0, 3, 16, 4], "texture": "#kbd"},
+        "south": {"uv": [0, 3, 16, 4], "texture": "#kbd"},
+        "east":  {"uv": [0, 3, 11, 4], "texture": "#kbd"},
+        "west":  {"uv": [0, 3, 11, 4], "texture": "#kbd"}
+      }
+    }
+  ],
+  "display": {
+    "gui": {
+      "rotation": [50, -25, 0],
+      "translation": [0, 1, 0],
+      "scale": [0.86, 0.86, 0.86]
+    },
+    "ground": {
+      "translation": [0, 2, 0],
+      "scale": [0.5, 0.5, 0.5]
+    },
+    "fixed": {
+      "rotation": [90, 0, 0],
+      "translation": [0, 0, -3],
+      "scale": [1, 1, 1]
+    },
+    "thirdperson_righthand": {
+      "rotation": [75, 0, 0],
+      "translation": [0, 3.5, 1.5],
+      "scale": [0.55, 0.55, 0.55]
+    },
+    "thirdperson_lefthand": {
+      "rotation": [75, 0, 0],
+      "translation": [0, 3.5, 1.5],
+      "scale": [0.55, 0.55, 0.55]
+    },
+    "firstperson_righthand": {
+      "rotation": [15, 0, 0],
+      "translation": [1, 2, -2],
+      "scale": [0.62, 0.62, 0.62]
+    },
+    "firstperson_lefthand": {
+      "rotation": [15, 0, 0],
+      "translation": [1, 2, -2],
+      "scale": [0.62, 0.62, 0.62]
+    }
+  },
+  "overrides": [
+    { "predicate": { "computermod:active": 1 }, "model": "computermod:item/channel_controller_powered" }
+  ]
+}

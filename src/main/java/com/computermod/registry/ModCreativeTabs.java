@@ -20,6 +20,7 @@ public class ModCreativeTabs {
 				output.accept(ModItems.COMPUTER.get());
 				output.accept(ModItems.SENSOR.get());
 				output.accept(ModItems.RECEIVER.get());
+				output.accept(ModItems.CONTROLLER.get());
 			})
 			.build());
 

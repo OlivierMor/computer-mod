@@ -3,6 +3,15 @@
   "block.computermod.computer": "Computer",
   "block.computermod.sensor": "Sensor",
   "block.computermod.receiver": "Receiver",
+  "item.computermod.channel_controller": "Controller",
+  "item.computermod.channel_controller.bindings": "%s binding(s)",
+  "item.computermod.channel_controller.hint": "Left-click: configure  •  Right-click: operate",
+
+  "computermod.controller.title": "Controller",
+  "computermod.controller.add": "+ Add binding",
+  "computermod.controller.apply": "Apply",
+  "computermod.controller.empty": "No bindings yet. Add one to map an input to a channel.",
+  "computermod.controller.active": "Controller active — bound inputs drive channels",
 
   "computermod.configuration.title": "Computer Mod Configs",
   "computermod.configuration.section.computermod.common.toml": "Computer Mod Configs",

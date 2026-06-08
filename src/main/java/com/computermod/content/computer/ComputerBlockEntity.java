@@ -68,7 +68,8 @@ public class ComputerBlockEntity extends KineticBlockEntity implements MenuProvi
 
 	public ComputerBlockEntity(BlockEntityType<?> type, BlockPos pos, BlockState state) {
 		super(type, pos, state);
-		energy = new ComputerEnergyStorage(Config.FE_CAPACITY.get(), Config.FE_CAPACITY.get());
+		energy = new ComputerEnergyStorage(Config.FE_CAPACITY.get(), Config.FE_CAPACITY.get(),
+			() -> level != null ? level.getGameTime() : 0L);
 	}
 
 	public static void registerCapabilities(RegisterCapabilitiesEvent event) {
@@ -94,9 +95,16 @@ public class ComputerBlockEntity extends KineticBlockEntity implements MenuProvi
 		return getSpeed() != 0 && !overStressed;
 	}
 
-	/** Electrically powered: the FE buffer holds at least one tick's worth of energy. */
+	/**
+	 * Electrically powered: a source is actively feeding the buffer <em>and</em> it holds at least
+	 * one tick's worth of energy. Requiring an active feed (not just stored charge) makes the
+	 * computer behave like a microcontroller — cut the supply and it powers down within a tick,
+	 * rather than coasting on whatever was left in the buffer.
+	 */
 	public boolean hasElectricalPower() {
-		return energy.getEnergyStored() >= Config.FE_PER_TICK.get();
+		return level != null
+			&& energy.isBeingSupplied(level.getGameTime())
+			&& energy.getEnergyStored() >= Config.FE_PER_TICK.get();
 	}
 
 	/** Powered by any source. */

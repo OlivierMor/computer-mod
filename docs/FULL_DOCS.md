@@ -1,52 +1,51 @@
-# Computer Mod Wiki
+# Computer Mod
 
-**Computer Mod** is an addon for the Minecraft tech mod **Create** (NeoForge 1.21.1) that adds a
-programmable **computer** you write real **Lua** code on, plus two small wall-mounted blocks — a
-**Sensor** (input) and a **Receiver** (output) — that connect the computer to the physical world over
-**wireless channels**.
+Computer Mod is an addon for the Create tech mod (NeoForge 1.21.1). It adds a programmable computer
+that runs real Lua code, plus three companion pieces that connect that code to the world: a **Sensor**
+(input), a **Receiver** (output), and a handheld **Controller** (manual input). They communicate over
+named **wireless channels**.
 
-This wiki explains the whole mod **from the ground up**: how to program in Lua even if you have never
-coded before, every block, every function, and how to read **any block from any other mod or Create
-addon**. Nothing is hidden.
+This documentation covers the whole mod from the ground up: writing Lua even if you have never coded,
+every block and item, every function, and how to read blocks from other mods and Create addons.
 
-## The big idea
+## The model
 
-The computer is a pure **brain**. It runs Lua, does math, remembers things, and talks over wireless
-channels — but it does **not** reach out and touch the blocks next to it. Instead:
+The computer is a brain. It runs Lua, does math, stores data, and reads and writes channels. It does
+not touch neighbouring blocks directly. Other pieces handle the physical world:
 
-- A **Sensor** is stuck to a block and **publishes everything it sees** about that block onto a channel.
-- The **computer** reads channels, makes decisions, and **emits** values onto channels.
-- A **Receiver** turns a channel value into a **redstone signal** to drive machines, lamps, Create
-  gearshifts, pistons — anything redstone can.
+- A **Sensor** mounts on a block and publishes everything it reads about that block to a channel.
+- The **computer** reads channels, decides what to do, and publishes values back to channels.
+- A **Receiver** converts a channel value into a redstone signal to drive machines, lamps, Create
+  gearshifts, pistons, and anything else redstone controls.
+- A **Controller** lets you, the player, drive channels by hand from your keyboard and mouse.
 
 ```
-   world  ──►  [Sensor]  ──►  channel  ──►  [Computer]  ──►  channel  ──►  [Receiver]  ──►  world
-              reads a block   (wireless)    your Lua code    (wireless)    emits redstone
+  world  ->  [Sensor]  ->  channel  ->  [Computer]  ->  channel  ->  [Receiver]  ->  world
+            reads a block   wireless     your Lua code   wireless     emits redstone
 ```
 
-Computers can also message each other over channels, and store data that survives reboots.
+Computers can also message each other over channels and store data that survives reboots.
 
-## Works with ANY mod or addon
+## Works with other mods
 
-The Sensor reads blocks **generically** — it has no mod-specific code. It pulls universal NeoForge
-data (item inventories, fluid tanks, Forge Energy), every blockstate property, and — most importantly
-— the block entity's **entire NBT**. Because almost every modded machine stores its state in NBT, you
-can **read the state of practically any block from any mod**, even one with no documented API. See
+The Sensor reads blocks generically, with no mod-specific code. It pulls standard NeoForge data (item
+inventories, fluid tanks, Forge Energy), every blockstate property, and the block entity's full NBT.
+Because almost every modded machine stores its state in NBT, you can read the state of practically any
+block from any mod, even one with no documented API. See
 [Reading Any Mod or Addon](#reading-any-mod-or-addon).
 
-## The "Copy for LLM" button
+## Copy for an LLM
 
-Click **📋 Copy all docs (Markdown)** at the top to copy this entire wiki as clean Markdown. Paste it
-into ChatGPT, Claude, or any LLM, then ask it to write a program (e.g. *"turn on a lamp when a tank is
-over half full"*). The doc tells the model exactly which functions exist, so it won't invent ones that
-don't.
+The **Copy all docs** button at the top copies this entire site as clean Markdown. Paste it into an
+LLM and ask it to write a program, for example "turn on a lamp when a tank is over half full". The
+text lists every function that exists, so the model stays within the real API.
 
-## Where to next?
+## Where to next
 
-- New to all of this? Start with **[Getting Started](#getting-started)**.
-- Never coded? Read **[Lua Basics](#lua-basics)**.
-- Want the function list? **[API Reference](#api-reference)**.
-- Reading a specific machine? **[The Sensor](#the-sensor)** and **[Reading Any Mod or Addon](#reading-any-mod-or-addon)**.
+- New here: start with [Getting Started](#getting-started).
+- Never coded: read [Lua Basics](#lua-basics).
+- Want the function list: see [API Reference](#api-reference).
+- Reading a specific machine: see [The Sensor](#the-sensor) and [Reading Any Mod or Addon](#reading-any-mod-or-addon).
 
 # Getting Started
 
@@ -54,24 +53,25 @@ This page gets a working computer running in about five minutes.
 
 ## 1. Place and power the computer
 
-The **Computer** is a full block with a **cogwheel running horizontally through its centre**, exactly
-like Create's Encased Cogwheel. Place it down, then give it power through that cogwheel — it runs on
-either of Create's two power types:
+The Computer is a full block with a cogwheel running horizontally through its centre, like Create's
+Encased Cogwheel. Place it, then power it through that cogwheel. It accepts either of Create's two
+power types:
 
-- **Rotation (recommended, free):** drive the central cogwheel. Mesh another **cogwheel** with it from
-  the side, or run a **shaft** into either end of its horizontal axis. Any non-zero RPM works as long as
-  the network isn't overstressed.
-- **Electricity (Forge Energy):** connect an FE cable/source from a mod that provides it. The computer
-  has an internal battery and sips a little FE each tick while running.
+- **Rotation (recommended, free):** drive the central cogwheel. Mesh another cogwheel with it from the
+  side, or run a shaft into either end of its horizontal axis. Any non-zero RPM works while the network
+  is not overstressed.
+- **Electricity (Forge Energy):** connect an FE cable or generator from a mod that provides one.
 
-When powered, the computer **boots**; when it loses power, it **halts**.
+When powered, the computer boots. When power is removed, it halts immediately. See
+[The Computer](#the-computer) for how this works in detail.
 
 ## 2. Write a program
 
-Right-click the computer to open its screen. There are two tabs:
+Right-click the computer to open its screen. It has two tabs:
 
-- **Code** — a full text editor (cursor, selection, copy/paste, Lua syntax highlighting, line numbers).
-- **Console** — where `print(...)` output and errors appear.
+- **Code** is a text editor with a cursor, selection, copy and paste, Lua syntax highlighting, and line
+  numbers.
+- **Console** shows `print(...)` output and errors.
 
 Type a first program in the Code tab:
 
@@ -81,16 +81,15 @@ print("Hello from my computer!")
 
 ## 3. Flash it
 
-Press **Flash** to save the program into the computer permanently (it survives the world being closed).
-If the computer is powered, flashing **reboots** it immediately. Switch to the **Console** tab and you'll
-see your message.
+Press **Flash** to store the program in the computer permanently. It survives closing the world. If the
+computer is powered, flashing reboots it right away. Switch to the Console tab to see your message.
 
-> A program that just runs top-to-bottom and finishes shows the state **FINISHED**. To keep doing work,
-> use a loop (next step).
+> A program that runs top to bottom and ends shows the state FINISHED. To keep working, use a loop, as
+> shown next.
 
-## 4. Make it do something forever
+## 4. Make it run continuously
 
-Most useful programs loop. Always put a `sleep` in a forever-loop so it paces itself:
+Most useful programs loop. Always put a `sleep` inside a forever-loop so it paces itself:
 
 ```lua
 print("counting...")
@@ -104,76 +103,84 @@ end
 
 ## 5. Connect it to the world
 
-1. **Place a Sensor** against a block you care about (e.g. a chest). It snaps flat to that face like a
-   button. Right-click it and set a **Channel** name, e.g. `chest`.
-2. **Place a Receiver** somewhere its redstone can drive a machine/lamp. Right-click it and set a
-   **Channel** name, e.g. `alarm`.
+1. Place a **Sensor** against a block you care about, such as a chest. It snaps flat to that face like a
+   button. Right-click it and set a channel name, for example `chest`.
+2. Place a **Receiver** where its redstone can drive a machine or lamp. Right-click it and set a channel
+   name, for example `alarm`.
 3. Flash this onto the computer:
 
 ```lua
 while true do
   local c = channel("chest")              -- the sensor's readings (a table)
   local count = (c and c.item_count) or 0
-  if count > 0 then emit("alarm", 15)     -- chest not empty -> redstone ON
+  if count > 0 then emit("alarm", 15)     -- chest not empty -> redstone on
   else emit("alarm", 0) end
   sleep(0.5)
 end
 ```
 
-That's the whole loop: **Sensor → channel → Computer → channel → Receiver**. Everything else in this
-wiki is detail on top of these pieces.
+That is the full loop: Sensor to channel to Computer to channel to Receiver. The rest of this site
+builds on these pieces.
 
 # The Computer
 
-The computer behaves like a **microcontroller**. You *flash* it with a program; it *runs* whenever it
-has power; it *forgets* its variables when power is lost.
+The computer behaves like a microcontroller. You flash it with a program, it runs while it has power,
+and it forgets its variables the moment power is lost.
 
 ## Flashing (the program is permanent)
 
-- Pressing **Flash** stores your Lua source into the block itself (saved with the world).
-- Flashing while powered **reboots** the computer cleanly with the new code.
-- The flashed code stays until you flash something else — breaking power does **not** erase it.
+- Pressing **Flash** stores your Lua source in the block itself, saved with the world.
+- Flashing while powered reboots the computer cleanly with the new code.
+- The flashed code stays until you flash something else. Cutting power does not erase it.
 
 ## Power
 
-The computer accepts **either** power type; whichever is present runs it:
+The computer accepts either power type. Whichever is present runs it:
 
 | Source | How | Notes |
 |---|---|---|
-| **Rotation (Create)** | Drive the **central cogwheel** — mesh a cogwheel from the side or run a shaft into either end of its horizontal axis | Free to run. Needs non-zero RPM and a non-overstressed network. Imposes a small stress load. |
-| **Forge Energy (FE)** | FE from a cable/generator into the block | Uses an internal FE battery; drains a little FE per tick, but **only when there's no rotation** (rotation is preferred and free). |
+| Rotation (Create) | Drive the central cogwheel: mesh a cogwheel from the side, or run a shaft into either end of its horizontal axis | Free to run. Needs non-zero RPM and a network that is not overstressed. Imposes a small stress load. |
+| Forge Energy (FE) | Feed FE from a cable or generator into the block | Consumes a fixed amount of FE per tick, and only when there is no rotation. Rotation is preferred and free. |
 
-`isPowered = has rotation OR has stored FE`. If neither is present, the computer is **OFF**.
+The computer is powered when it has rotation or is actively receiving FE. If neither is present, it is
+OFF.
 
-## Boot & halt behaviour
+## Power loss is immediate
 
-- **Power on (rising edge):** the computer boots a **fresh** runtime from the flashed code — variables
-  (RAM) start empty and the Console is cleared. The program runs from the top.
-- **Power off:** the computer **halts** immediately, **discards all variables (RAM)**, and *freezes* the
-  last Console output on screen for you to read. The next boot clears it.
-- **Program finishes:** if your code reaches the end (no loop), it stops at **FINISHED** until the next
+Like a real microcontroller, the computer runs only while power is actually being supplied. It has a
+small internal FE buffer that smooths the incoming supply, but that buffer is not a battery: it cannot
+keep the computer running on its own. Stop driving the cogwheel, or disconnect the FE source, and the
+computer powers down within a single tick. It does not coast on stored charge.
+
+## Boot and halt behaviour
+
+- **Power on:** the computer boots a fresh runtime from the flashed code. Variables (RAM) start empty
+  and the Console is cleared. The program runs from the top.
+- **Power off:** the computer halts at once and discards all variables (RAM). The last Console output
+  stays frozen on screen so you can read it. The next boot clears it.
+- **Program finishes:** if your code reaches the end with no loop, it stops at FINISHED until the next
   power cycle.
 
-> **RAM vs disk vs flash.** *Flash* = your code (permanent). *Disk* = a key/value store you control that
-> also persists (see [API Reference](#api-reference)). *RAM* = your variables while running — wiped on
-> power loss. Put anything that must survive into `disk`.
+> RAM, disk, and flash are three different stores. Flash holds your code and is permanent. Disk is a
+> key/value store you control that also persists (see [API Reference](#api-reference)). RAM holds your
+> variables while running and is wiped on power loss. Put anything that must survive into `disk`.
 
 ## Run states
 
 The screen shows one of four states:
 
-- **OFF** — no power; not running.
-- **RUNNING** — executing your program.
-- **FINISHED** — the program returned/ended without error.
-- **ERROR** — the program crashed; the message is printed to the Console.
+- **OFF:** no power, not running.
+- **RUNNING:** executing your program.
+- **FINISHED:** the program ended without error.
+- **ERROR:** the program crashed. The message is printed to the Console.
 
 ## Performance
 
-The program runs on its **own thread** at a fixed *clock speed* measured in Lua instructions per game
-tick (default **200,000 per tick** = ~**4,000,000 per second**, configurable). Pure computation and a
-`while true` loop run at full speed — you do **not** need to (and shouldn't) match the 20 ticks/second
-game rate for logic. Only `sleep` and world round-trips are tick-bound. See
-[Patterns &amp; Recipes](#patterns-recipes) for loop pacing.
+The program runs on its own thread at a fixed clock speed, measured in Lua instructions per game tick
+(default 200,000 per tick, about 4,000,000 per second, configurable). Pure computation and a
+`while true` loop run at full speed. Logic does not need to match the 20 ticks per second game rate.
+Only `sleep` and world round-trips are tick-bound. See [Patterns and Recipes](#patterns-and-recipes)
+for loop pacing.
 
 ## Configuration
 
@@ -181,42 +188,42 @@ Server config file `computermod-common.toml` (NeoForge):
 
 | Key | Default | Meaning |
 |---|---|---|
-| `maxOpsPerTick` | 200000 | Lua instructions per game tick (×20 = per second). Higher = faster compute, more CPU per running computer. |
-| `minRpm` | 1.0 | Minimum absolute RPM for a kinetically-powered computer to run. |
-| `feCapacity` | 100000 | Internal Forge Energy buffer size (FE). |
-| `fePerTick` | 20 | FE consumed per tick when running on electricity (ignored while kinetically powered). |
+| `maxOpsPerTick` | 200000 | Lua instructions per game tick (times 20 for per second). Higher means faster compute and more CPU per running computer. |
+| `minRpm` | 1.0 | Minimum absolute RPM for a kinetically powered computer to run. |
+| `feCapacity` | 100000 | Internal Forge Energy smoothing buffer (FE). |
+| `fePerTick` | 20 | FE consumed per tick when running on electricity. Ignored while kinetically powered. |
 
 # The Sensor
 
-The Sensor is a **thin plate** that mounts flat against a block, just like a button or Create's
-Redstone Link. Whatever block it is stuck to is the block it **reads**.
+The Sensor is a thin plate that mounts flat against a block, like a button or Create's Redstone Link.
+Whatever block it is attached to is the block it reads.
 
 ## Placing it
 
-Aim at the face of a block and place the Sensor — it snaps onto that face. If the block it's mounted to
-is removed, the Sensor pops off and drops. It can mount on any side (walls, floor, ceiling).
+Aim at the face of a block and place the Sensor. It snaps onto that face. If the block it is mounted to
+is removed, the Sensor pops off and drops. It mounts on any side, including walls, floor, and ceiling.
 
 ## What it does
 
-The Sensor scans the block it's attached to **every tick** and **publishes the complete readings table
-the instant anything changes** — add an item, change a fluid level, flip a blockstate, and it transmits
-that **same tick** with no polling delay. (If nothing changed, it stays quiet; the channel already holds
-the latest value.) Right-click the Sensor to set the **Channel** name; that's the only setting.
+The Sensor scans the block it is attached to every tick and publishes the complete readings table the
+instant anything changes. Add an item, change a fluid level, or flip a blockstate, and it transmits on
+that same tick with no polling delay. If nothing changed, it stays quiet, since the channel already
+holds the latest value. Right-click the Sensor to set its channel name, which is the only setting.
 
-> Because it always publishes the **whole table**, `channel("name")` from a sensor is always a Lua
-> **table** — you index into it (e.g. `channel("name").item_count`). It never publishes a bare value.
+> Because it always publishes the whole table, `channel("name")` from a sensor is always a Lua table.
+> Index into it, for example `channel("name").item_count`. It never publishes a bare value.
 
 ## The live readings panel
 
-The Sensor's GUI shows, **live**, exactly what it currently sees, as a **collapsible tree**. Container
-values like `state`, `items`, and `nbt` show a `▸` arrow — click to expand and drill into their nested
-fields. This lets you discover precisely which fields a given block exposes **before** you write any
-code. Scroll with the mouse wheel.
+The Sensor's GUI shows, live, exactly what it currently sees, as a collapsible tree. Container values
+such as `state`, `items`, and `nbt` show an expand arrow. Click it to open their nested fields. This
+lets you discover which fields a given block exposes before you write any code. Scroll with the mouse
+wheel.
 
 ## Reading fields
 
-Which fields appear **depends on the block**. Always guard with `if t.field then ... end`. The full set
-of possible fields:
+Which fields appear depends on the block. Always guard with `if t.field then ... end`. The full set of
+possible fields:
 
 | Field | Type | Appears when | Meaning |
 |---|---|---|---|
@@ -233,8 +240,8 @@ of possible fields:
 | `tanks` | array | block has fluid tanks | One entry `{ fluid="<id>", amount=<mB>, capacity }` per tank. |
 | `energy` / `energy_capacity` | number | block stores Forge Energy | Stored / maximum FE. |
 | `state` | table | always | Every blockstate property, e.g. `state.powered`, `state.facing`, `state.level`. |
-| `analog_output` | number | block emits a comparator signal | Comparator output 0–15 (e.g. container fullness). |
-| `nbt` | table | block has a block entity | The block entity's **entire saved data** as a nested table — the universal fallback. See [Reading Any Mod or Addon](#reading-any-mod-or-addon). |
+| `analog_output` | number | block emits a comparator signal | Comparator output 0 through 15, such as container fullness. |
+| `nbt` | table | block has a block entity | The block entity's entire saved data as a nested table, the universal fallback. See [Reading Any Mod or Addon](#reading-any-mod-or-addon). |
 
 ### Example
 
@@ -249,21 +256,21 @@ end
 
 # The Receiver
 
-The Receiver is the computer's hands. Like the Sensor it's a **thin plate** mounted against a block
-face (it pops off if that block is removed), but it doesn't read anything — it just **outputs redstone**.
+The Receiver is the computer's hands. Like the Sensor it is a thin plate mounted against a block face,
+and it pops off if that block is removed. It reads nothing. It only outputs redstone.
 
 ## What it does
 
-Set a **Channel** (right-click). The Receiver reads the latest value on that channel and emits a
-redstone signal on **all sides**, every tick:
+Right-click to set a channel. The Receiver reads the latest value on that channel and emits a redstone
+signal on all sides, every tick:
 
 | Channel value | Redstone output |
 |---|---|
-| a number | clamped to **0–15** |
-| `true` | **15** |
-| `false`, `nil`, nothing | **0** |
-| a numeric string like `"7"` | parsed, clamped to **0–15** |
-| anything else (e.g. a table) | **0** |
+| a number | clamped to 0 through 15 |
+| `true` | 15 |
+| `false`, `nil`, nothing | 0 |
+| a numeric string like `"7"` | parsed, clamped to 0 through 15 |
+| anything else, such as a table | 0 |
 
 ```lua
 emit("pump", true)   -- receiver on "pump" outputs 15
@@ -271,16 +278,79 @@ emit("pump", 7)      -- outputs 7
 emit("pump", false)  -- outputs 0
 ```
 
-> **Don't wire a Receiver directly to a Sensor's channel.** A Sensor publishes a *table*, which a
-> Receiver reads as 0. The intended flow is Sensor → **Computer decides** → `emit` a number/boolean →
-> Receiver. The computer is what turns rich data into a redstone decision.
+> Avoid wiring a Receiver directly to a Sensor's channel. A Sensor publishes a table, which a Receiver
+> reads as 0. The intended flow is Sensor to Computer to Receiver: the computer reads the sensor data,
+> decides, and emits a number or boolean for the Receiver to convert into redstone.
 
-> For plain 0–15 wireless redstone with no logic, Create's own **Redstone Link** already works and is
-> separate from this system. These channels are for **rich data** and computer logic.
+> For plain wireless redstone of 0 through 15 with no logic, Create's own Redstone Link already does the
+> job and is separate from this system. These channels are for rich data and computer logic.
+
+# The Controller
+
+The Controller is a handheld item that lets you, the player, drive channels directly from your keyboard
+and mouse. It publishes to the same channels as everything else, so a key press can flip a Receiver,
+feed a value into a running program, or trigger any logic listening on that channel. It is useful for
+manual control and for testing a setup before writing code.
+
+## Holding it
+
+Hold the Controller in either hand. Two actions are bound to it:
+
+- **Left-click** opens the configuration screen.
+- **Right-click** toggles operate mode on and off.
+
+## Configuring bindings
+
+The configuration screen is a list of rows. Each row maps one input to one channel with a mode. Press
+**Add binding** to create a row, then set:
+
+- **Input:** click the input button, then press the key, mouse button, or scroll wheel you want. Press
+  Escape to cancel.
+- **Channel:** type the channel name. A dropdown suggests channels that already exist.
+- **Mode:** click to cycle through the modes available for that input.
+
+| Mode | Input | Effect |
+|---|---|---|
+| toggle | key or mouse button | Each press flips the channel between `false` and `true`. |
+| hold | key or mouse button | Channel is `true` while the input is held, `false` when released. |
+| analog | scroll wheel only | Channel is a number moved through a range by scrolling. |
+
+For an analog row, set **min**, **max**, and **step**. Scrolling up and down moves the value through
+`[min, max]` in `step` increments. Press **Apply** to save the bindings onto the item. You can define up
+to 10 bindings.
+
+## Operate mode
+
+Right-click to start operating. While operating:
+
+- Each bound input drives its channel. The moment you start, every binding publishes its resting value:
+  `false` for hold, the remembered state for toggle, and `min` for analog.
+- A bound input's normal game function is suppressed, so a bound W key no longer walks you forward.
+- Every input you did not bind keeps working as usual. This partial passthrough is what separates the
+  Controller from Create's Linked Controller, which locks you in place.
+- A small heads-up display lists each binding and its live value.
+
+Right-click again to stop. Switching away from the item also stops operating. Either way, held channels
+are released and the suppressed keys are restored.
+
+## How values land on channels
+
+Toggle and hold publish booleans. Analog publishes numbers. These arrive on the channel exactly as if a
+computer had called `emit`, so a Receiver converts them to redstone and a computer reads them with
+`channel(name)`. Publishes are edge-triggered: a value is sent only when it actually changes.
+
+```lua
+-- a computer reading a Controller binding on channel "throttle" (analog 0..15)
+while true do
+  local v = channel("throttle") or 0
+  emit("motor", v)            -- pass the player's scroll value to a Receiver
+  sleep(0.1)
+end
+```
 
 # Lua Basics
 
-The computer runs **Lua 5.1**. This page teaches enough Lua to be productive even if you've never
+The computer runs Lua 5.1. This page teaches enough Lua to be productive even if you have never
 programmed. If you already know Lua, skip to the [API Reference](#api-reference).
 
 ## Comments
@@ -342,7 +412,8 @@ end
 
 Comparisons: `==` equal, `~=` not equal, `<`, `>`, `<=`, `>=`. Combine with `and`, `or`, `not`.
 
-> **Truthiness:** only `false` and `nil` are "false". **`0` and `""` are TRUE** in Lua — a common trap.
+> Truthiness: only `false` and `nil` count as false. In Lua, `0` and `""` are both true, which is a
+> common trap.
 
 ## Loops
 
@@ -364,8 +435,8 @@ end
 
 ## Tables (lists and dictionaries)
 
-Tables are Lua's one data structure — they're both arrays and key/value maps. **Arrays are
-1-indexed.**
+Tables are Lua's one data structure. They serve as both arrays and key/value maps. Arrays are
+1-indexed.
 
 ```lua
 -- list / array
@@ -385,7 +456,8 @@ for i, f in ipairs(fruits) do print(i, f) end
 for key, value in pairs(player) do print(key, value) end
 ```
 
-Sensor readings arrive as tables exactly like these — `t.item_count`, `t.items[1].count`, etc.
+Sensor readings arrive as tables exactly like these, for example `t.item_count` and
+`t.items[1].count`.
 
 ## Functions
 
@@ -409,24 +481,25 @@ if not ok then print("caught: " .. err) end
 
 # API Reference
 
-Everything the computer can call. The computer talks to the world **only** through these — there is no
-`scan`, `redstone`, `setOutput`, `moveItems`, etc. (those belong to the Sensor/Receiver blocks).
+Everything the computer can call. The computer talks to the world only through these functions. There
+is no `scan`, `redstone`, `setOutput`, or `moveItems`; that work belongs to the Sensor and Receiver
+blocks.
 
 ## Function index
 
 | Function | Returns | Purpose |
 |---|---|---|
-| `print(...)` | — | Write a line to the Console. Multiple arguments allowed. |
-| `getLocation()` | `{x,y,z}` | This computer's own world coordinates (a built-in GPS receiver). |
-| `emit(channel, value)` | — | Publish any value (number/string/boolean/table) on a named channel. |
-| `channel(name)` | value / nil | The latest value on a channel, or `nil` if none. |
+| `print(...)` | none | Write a line to the Console. Multiple arguments allowed. |
+| `getLocation()` | `{x,y,z}` | This computer's own world coordinates, like a built-in GPS receiver. |
+| `emit(channel, value)` | none | Publish any value (number, string, boolean, or table) on a named channel. |
+| `channel(name)` | value or nil | The latest value on a channel, or `nil` if none. |
 | `channels()` | table | Array of all active channel names. |
-| `disk.set(key, value)` | — | Persistent storage write. `nil` value deletes the key. |
-| `disk.get(key)` | value / nil | Persistent storage read. |
-| `disk.delete(key)` | — | Remove one key. |
+| `disk.set(key, value)` | none | Persistent storage write. A `nil` value deletes the key. |
+| `disk.get(key)` | value or nil | Persistent storage read. |
+| `disk.delete(key)` | none | Remove one key. |
 | `disk.list()` | table | Array of stored key names. |
-| `disk.clear()` | — | Wipe the whole disk. |
-| `sleep(seconds)` | — | Idle without using clock budget (minimum one tick = 0.05s). |
+| `disk.clear()` | none | Wipe the whole disk. |
+| `sleep(seconds)` | none | Idle without using clock budget (minimum one tick, 0.05s). |
 
 ## Output
 
@@ -436,29 +509,28 @@ Use it constantly while debugging.
 
 ## Location (built-in GPS)
 
-### `getLocation()` → `{ x=, y=, z= }`
-Returns this computer's own block coordinates. A stationary computer reports a fixed position; broadcast
+### `getLocation()` returns `{ x=, y=, z= }`
+Returns this computer's own block coordinates. A stationary computer reports a fixed position. Broadcast
 it on a channel and other computers can navigate relative to it (see
-[Patterns &amp; Recipes](#patterns-recipes)).
+[Patterns and Recipes](#patterns-and-recipes)).
 
-## Wireless channels — the computer's I/O
+## Wireless channels: the computer's I/O
 
 ### `emit(channelName, value)`
-Publishes a value on a channel. The value can be a number, string, boolean, or a (possibly nested)
-table. This is how a computer drives Receivers and messages other computers. Emitting `nil` clears the
-channel.
+Publishes a value on a channel. The value can be a number, string, boolean, or a nested table. This is
+how a computer drives Receivers and messages other computers. Emitting `nil` clears the channel.
 
-### `channel(channelName)` → value / nil
-Reads the **latest** value on a channel, or `nil` if nothing has been published. The type is whatever
-was published — often a **table** when the source is a Sensor.
+### `channel(channelName)` returns a value or nil
+Reads the latest value on a channel, or `nil` if nothing has been published. The type is whatever was
+published, often a table when the source is a Sensor.
 
-### `channels()` → table
+### `channels()` returns a table
 Returns an array of all channel names that currently hold a value.
 
 ## Persistent storage (disk)
 
-A key/value store on the computer that **survives reboots, power loss, and world reloads** — unlike RAM
-variables. Up to **1024 keys**. Values may be numbers, strings, booleans, or tables.
+A key/value store on the computer that survives reboots, power loss, and world reloads, unlike RAM
+variables. It holds up to 1024 keys. Values may be numbers, strings, booleans, or tables.
 
 ```lua
 local boots = disk.get("boots") or 0
@@ -466,11 +538,11 @@ disk.set("boots", boots + 1)
 print("booted " .. (boots + 1) .. " times")   -- counts up across reboots
 ```
 
-- `disk.set(key, value)` — store (or, with `nil`, delete) a value.
-- `disk.get(key)` — read a value or `nil`.
-- `disk.delete(key)` — remove a key.
-- `disk.list()` — array of stored keys.
-- `disk.clear()` — wipe everything.
+- `disk.set(key, value)` stores a value, or deletes the key when given `nil`.
+- `disk.get(key)` reads a value, or `nil` if the key is unset.
+- `disk.delete(key)` removes a key.
+- `disk.list()` returns an array of stored keys.
+- `disk.clear()` wipes everything.
 
 > `disk.*` calls do a quick round-trip to the server thread, so they take about one game tick each.
 > Read/write in bulk outside tight inner loops where you can.
@@ -483,16 +555,15 @@ game tick (**0.05s**); `sleep(0.02)` still waits one tick. Put a `sleep` in ever
 
 ## The Lua sandbox
 
-You get **Lua 5.1** with the standard libraries that make sense in a game:
+You get Lua 5.1 with the standard libraries that make sense in a game.
 
-**Available:** base functions (`print`, `type`, `tostring`, `tonumber`, `pairs`, `ipairs`, `next`,
+Available: base functions (`print`, `type`, `tostring`, `tonumber`, `pairs`, `ipairs`, `next`,
 `select`, `error`, `assert`, `pcall`, `xpcall`, `setmetatable`, `getmetatable`, `rawget`, `rawset`,
-`unpack`, `#`, …), **`math.*`**, **`string.*`**, **`table.*`**, and **`os.time` / `os.clock` /
-`os.date`**.
+`unpack`, `#`, and so on), `math.*`, `string.*`, `table.*`, and `os.time`, `os.clock`, `os.date`.
 
-**Disabled for safety** (do not use — they are `nil`): `io`, file access, `os.execute`/`os.exit`,
-`require`, `package`, `load` / `loadstring` / `dofile` / `loadfile`, `debug`, `collectgarbage`, and any
-Java access (`luajava`).
+Disabled for safety (these are `nil`): `io`, file access, `os.execute`, `os.exit`, `require`,
+`package`, `load`, `loadstring`, `dofile`, `loadfile`, `debug`, `collectgarbage`, and any Java access
+(`luajava`).
 
 # Channels
 
@@ -500,18 +571,18 @@ Channels are the wireless backbone that ties everything together.
 
 ## What they are
 
-A channel is a **server-wide named mailbox** holding a single **latest value**. Computers, Sensors, and
-Receivers all share the same set of channels by name. Pick any name you like (`"tank"`, `"alarm"`,
-`"base-coords"`).
+A channel is a server-wide named mailbox holding a single latest value. Computers, Sensors, Receivers,
+and Controllers all share the same set of channels by name. Pick any name you like, such as `"tank"`,
+`"alarm"`, or `"base-coords"`.
 
-- **`emit(name, value)`** (computer) or a **Sensor** writes the latest value.
-- **`channel(name)`** (computer) or a **Receiver** reads the latest value.
+- A computer's `emit(name, value)`, a Sensor, or a Controller writes the latest value.
+- A computer's `channel(name)` or a Receiver reads the latest value.
 
-## Rich values, not just 0–15
+## Rich values beyond 0 to 15
 
-Unlike vanilla/Create redstone (a single 0–15 number), a channel can carry a **number, string, boolean,
-or a whole nested table**. That's what lets a Sensor hand the computer a full inventory listing, and
-lets computers send each other structured messages.
+Vanilla and Create redstone carry a single number from 0 to 15. A channel can carry a number, string,
+boolean, or a whole nested table. That is what lets a Sensor hand the computer a full inventory listing,
+and lets computers send each other structured messages.
 
 ```lua
 emit("status", { online = true, items = 42, name = "sorter-3" })
@@ -520,48 +591,47 @@ local s = channel("status")
 if s and s.online then print(s.name .. " has " .. s.items) end
 ```
 
-## Latest-value, not a queue
+## Latest value only
 
-A channel remembers only the **most recent** value. If you publish faster than someone reads, earlier
-values are simply overwritten. For control logic this is exactly what you want (you care about the
-*current* state).
+A channel remembers only the most recent value. If you publish faster than someone reads, earlier
+values are overwritten. For control logic this is the behaviour you want, since you care about the
+current state.
 
 ## Lifetime
 
-Channels are **runtime state**: they are **not saved** and are **cleared when the server stops**.
-Sensors and looping computers re-publish constantly, so values reappear as soon as things are running
-again. For data that must persist, use the computer's [disk](#api-reference).
+Channels are runtime state. They are not saved and are cleared when the server stops. Sensors and
+looping computers re-publish constantly, so values reappear as soon as things are running again. For
+data that must persist, use the computer's [disk](#api-reference).
 
 # Reading Any Mod or Addon
 
-One of the most powerful things about this mod: the Sensor reads blocks **generically**, with **zero
-mod-specific code**. That means you can read machines from Create addons and completely unrelated mods.
+The Sensor reads blocks generically, with no mod-specific code. That means you can read machines from
+Create addons and from completely unrelated mods.
 
 ## Three universal layers
 
-When a Sensor scans a block, it gathers data from up to five providers. Three of them work for *any*
-mod:
+When a Sensor scans a block, it gathers data from several providers. Three of them work for any mod:
 
-1. **Capabilities** — if a block exposes the standard NeoForge capabilities, you get them with no
-   special handling:
-   - **Item inventory** → `items`, `item_count`, `slots`
-   - **Fluid tanks** → `tanks`
-   - **Forge Energy** → `energy`, `energy_capacity`
+1. **Capabilities.** If a block exposes the standard NeoForge capabilities, you get them with no special
+   handling:
+   - Item inventory gives `items`, `item_count`, and `slots`.
+   - Fluid tanks give `tanks`.
+   - Forge Energy gives `energy` and `energy_capacity`.
 
    Practically every modded machine with an inventory, tank, or energy buffer exposes these.
 
-2. **Blockstate** — every block's visible state properties appear under `state` (e.g. `state.powered`,
-   `state.lit`, `state.facing`, `state.level`, custom addon properties). Also `analog_output` if the
-   block emits a comparator signal.
+2. **Blockstate.** Every block's visible state properties appear under `state`, such as `state.powered`,
+   `state.lit`, `state.facing`, `state.level`, and custom addon properties. The `analog_output` field
+   also appears if the block emits a comparator signal.
 
-3. **NBT — the universal fallback.** This is the key one.
+3. **NBT**, the universal fallback. This is the important one.
 
-## Custom mod data is ALWAYS in the NBT
+## Custom mod data lives in the NBT
 
-Almost every modded block that has any state stores it in its **block entity NBT** (that's how Minecraft
-saves it to disk). The Sensor exposes that entire NBT as a nested table under **`nbt`**. So even if a
-mod offers **no API, no capability, and no documentation**, you can still read its state — because
-whatever it persists is sitting right there in `nbt`.
+Almost every modded block that holds any state stores it in its block entity NBT, which is how
+Minecraft saves it to disk. The Sensor exposes that entire NBT as a nested table under `nbt`. Even if a
+mod offers no API, no capability, and no documentation, you can still read its state, because whatever
+it persists is sitting right there in `nbt`.
 
 ```lua
 -- read a field a Create addon stores in NBT (example: a steering wheel's angle)
@@ -576,8 +646,8 @@ end
 You never have to guess:
 
 1. **Use the Sensor GUI.** Mount the Sensor on the block and open it. The live tree shows every field,
-   including the full `nbt` subtree — click `▸` to expand `nbt` and read off the exact key names and
-   their current values.
+   including the full `nbt` subtree. Click the arrow to expand `nbt` and read off the exact key names
+   and their current values.
 2. **Or dump it in Lua** with `pairs`:
 
 ```lua
@@ -591,22 +661,22 @@ end
 
 ## Things to know about `nbt`
 
-- The **key names and structure are defined by that mod**, not standardized — inspect with the GUI tree
-  or `pairs` to learn them. Once you know a field name, just read it each scan.
-- Numbers come through as Lua numbers; nested compounds become **tables**; lists become **arrays**.
-- It reflects what the block **persists to disk**. Purely visual/client-only effects might not be in
-  NBT, but anything the machine actually saves (progress, contents, modes, fuel, angles, etc.) is.
-- For common things (items/fluids/energy) prefer the dedicated fields (`items`, `tanks`, `energy`) —
-  they're cleaner. Reach into `nbt` for the mod-specific extras.
+- The key names and structure are defined by each mod and are not standardized. Inspect them with the
+  GUI tree or `pairs` to learn them. Once you know a field name, read it each scan.
+- Numbers come through as Lua numbers, nested compounds become tables, and lists become arrays.
+- It reflects what the block persists to disk. Purely visual or client-only effects may not be in NBT,
+  but anything the machine actually saves (progress, contents, modes, fuel, angles, and so on) is.
+- For common data such as items, fluids, and energy, prefer the dedicated fields `items`, `tanks`, and
+  `energy`, which are cleaner. Reach into `nbt` for the mod-specific extras.
 
-> **Bottom line:** between capabilities, blockstate, and NBT, you can read the state of virtually any
-> block from any mod or Create addon — no integration code required.
+> Between capabilities, blockstate, and NBT, you can read the state of virtually any block from any mod
+> or Create addon, with no integration code required.
 
-# Patterns & Recipes
+# Patterns and Recipes
 
-Reusable shapes for real programs. All of them assume Sensors/Receivers are set to the named channels.
+Reusable shapes for real programs. They assume Sensors and Receivers are set to the named channels.
 
-## The standard control loop (read → decide → act)
+## The standard control loop (read, decide, act)
 
 ```lua
 while true do
@@ -706,8 +776,8 @@ end
 
 ## Tank guard with status display
 
-Sensor on a tank → channel `boiler`. Computer keeps the tank between 20% and 80% and reports status to
-another computer over channel `report`.
+A Sensor on a tank publishes to channel `boiler`. The computer keeps the tank between 20% and 80% and
+reports status to another computer over channel `report`.
 
 ```lua
 local function pct(tk) return tk.capacity > 0 and (tk.amount / tk.capacity * 100) or 0 end
@@ -730,8 +800,8 @@ end
 
 ## Overstress alarm
 
-Sensor on any Create kinetic block → channel `drive`. Flash a lamp (Receiver on `alarm`) when the
-network is overstressed.
+A Sensor on any Create kinetic block publishes to channel `drive`. Flash a lamp (a Receiver on
+`alarm`) when the network is overstressed.
 
 ```lua
 while true do
@@ -745,42 +815,47 @@ while true do
 end
 ```
 
-# Troubleshooting & FAQ
+# Troubleshooting and FAQ
 
-## My program does nothing / state is OFF
-The computer has no power. Drive its central cogwheel (mesh a cogwheel or run a shaft into its
+## My program does nothing and the state is OFF
+The computer has no power. Drive its central cogwheel (mesh a cogwheel, or run a shaft into its
 horizontal axis), or supply Forge Energy. Check the state shown on the screen.
 
 ## It shows FINISHED immediately
 Your program ran to the end with no loop. Wrap the logic in `while true do ... sleep(...) end`.
 
 ## It shows ERROR
-Read the message in the **Console** — it includes the line number. Most common causes:
-- **Indexing nil:** `t.foo.bar` when `t.foo` is `nil`. Guard with `if t.foo then`.
-- **Concatenating nil:** `"x=" .. t.foo` when `t.foo` is `nil`. Use `tostring(t.foo)`.
+Read the message in the Console. It includes the line number. The most common causes are:
+- Indexing nil: `t.foo.bar` when `t.foo` is `nil`. Guard with `if t.foo then`.
+- Concatenating nil: `"x=" .. t.foo` when `t.foo` is `nil`. Use `tostring(t.foo)`.
+
+## It keeps running after I remove power
+It should not. The computer powers off within one tick of losing its supply. If it stays on, something
+is still feeding it: a shaft or cogwheel is still turning it, or an FE source is still connected. Check
+both power inputs.
 
 ## `channel("x")` is nil
-Nothing is publishing on that channel yet. Check the Sensor's channel name matches exactly, that the
-Sensor is powered into the world (it's placed and mounted), and that the publisher is running.
+Nothing is publishing on that channel yet. Check that the Sensor's channel name matches exactly, that
+the Sensor is placed and mounted in the world, and that the publisher is running.
 
 ## My Receiver always outputs 0
-It's probably wired straight to a **Sensor's** channel, which carries a *table*. Route it through the
-computer: read the sensor, decide, and `emit` a number/boolean on the Receiver's channel.
+It is probably wired straight to a Sensor's channel, which carries a table. Route it through the
+computer: read the sensor, decide, and `emit` a number or boolean on the Receiver's channel.
 
-## A field I expected isn't there
-Fields depend on the block. Open the **Sensor GUI** and look at the live tree to see exactly what that
-block exposes. For mod-specific values, expand the `nbt` subtree — see
+## A field I expected is not there
+Fields depend on the block. Open the Sensor GUI and look at the live tree to see exactly what that block
+exposes. For mod-specific values, expand the `nbt` subtree. See
 [Reading Any Mod or Addon](#reading-any-mod-or-addon).
 
 ## My variables reset
-That's RAM — it's wiped on power loss by design. Use `disk.*` for anything that must persist; your code
-persists in flash.
+That is RAM, which is wiped on power loss by design. Use `disk.*` for anything that must persist. Your
+code persists in flash.
 
 ## Gotchas checklist
-- Tables are **1-indexed** (`t[1]`, not `t[0]`).
-- **`0` and `""` are truthy**; only `nil`/`false` are falsey.
+- Tables are 1-indexed: use `t[1]`, not `t[0]`.
+- `0` and `""` are truthy. Only `nil` and `false` are falsey.
 - Always `sleep` inside forever-loops.
-- A Sensor always publishes a **table** — index into it.
+- A Sensor always publishes a table, so index into it.
 - Use `local` for variables.
 
 # Cheat Sheet
@@ -806,10 +881,11 @@ Disabled: io, require, package, load/loadstring, debug, os.execute, collectgarba
 DATA FLOW
   world -> [Sensor] -> channel -> [Computer] -> channel -> [Receiver] -> world
 
-BLOCKS
-  Computer  full block, powered by a cogwheel through its centre (or FE); flash Lua onto it
-  Sensor    thin plate on a block face; publishes that block's full reading table
-  Receiver  thin plate; turns a channel value into redstone (num->0-15, true->15)
+BLOCKS & ITEMS
+  Computer    full block, powered by a cogwheel through its centre (or FE); flash Lua onto it
+  Sensor      thin plate on a block face; publishes that block's full reading table
+  Receiver    thin plate; turns a channel value into redstone (num->0-15, true->15)
+  Controller  handheld; binds keys/mouse/scroll to channels (left-click config, right-click operate)
 
 SENSOR FIELDS (depend on block)
   block  is_air  has_block_entity
@@ -818,5 +894,5 @@ SENSOR FIELDS (depend on block)
   tanks[]                                              (fluids)
   energy  energy_capacity                              (Forge Energy)
   state{}  analog_output                               (blockstate / comparator)
-  nbt{}    <- everything a block entity saves; read ANY mod's state here
+  nbt{}    <- everything a block entity saves; read any mod's state here
 ```

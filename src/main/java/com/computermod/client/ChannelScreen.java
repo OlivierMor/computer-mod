@@ -10,6 +10,7 @@ import com.computermod.content.channel.ChannelMenu;
 import com.computermod.content.channel.SensorBlockEntity;
 import com.computermod.content.channel.SensorBlockEntity.Node;
 import com.computermod.network.ConfigureChannelC2S;
+import com.computermod.network.RequestChannelsC2S;
 
 import net.minecraft.Util;
 import net.minecraft.client.gui.GuiGraphics;
@@ -20,6 +21,8 @@ import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.player.Inventory;
 import net.neoforged.neoforge.network.PacketDistributor;
+
+import org.lwjgl.glfw.GLFW;
 
 /** Configuration GUI for the sensor and receiver blocks. */
 public class ChannelScreen extends AbstractContainerScreen<ChannelMenu> {
@@ -38,6 +41,8 @@ public class ChannelScreen extends AbstractContainerScreen<ChannelMenu> {
 	private static final int COL_TABLE = 0x6FA8FF;
 
 	private EditBox channelBox;
+	private ChannelSuggestions suggestions;
+	private int refreshTimer = 0;
 	private int scrollOffset = 0;
 	/** Indices (into the flat node list) of expanded container rows. */
 	private final Set<Integer> expanded = new HashSet<>();
@@ -70,6 +75,19 @@ public class ChannelScreen extends AbstractContainerScreen<ChannelMenu> {
 			.bounds(leftPos + 12, topPos + imageHeight - 26, 64, 18).build();
 		wiki.active = !WIKI_URL.isEmpty();
 		addRenderableWidget(wiki);
+
+		suggestions = new ChannelSuggestions(font);
+		suggestions.setBox(channelBox);
+		PacketDistributor.sendToServer(RequestChannelsC2S.INSTANCE); // pull the current channel list
+	}
+
+	@Override
+	protected void containerTick() {
+		super.containerTick();
+		if (++refreshTimer >= 20) { // keep the suggestion list fresh while the GUI is open
+			refreshTimer = 0;
+			PacketDistributor.sendToServer(RequestChannelsC2S.INSTANCE);
+		}
 	}
 
 	private void openWiki() {
@@ -118,7 +136,22 @@ public class ChannelScreen extends AbstractContainerScreen<ChannelMenu> {
 	}
 
 	@Override
+	public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+		// Only Escape closes the GUI — otherwise typing 'e' (the inventory key) in the channel box
+		// would exit the screen. Route everything else to the focused widget.
+		if (keyCode == GLFW.GLFW_KEY_ESCAPE) {
+			onClose();
+			return true;
+		}
+		if (getFocused() != null && getFocused().keyPressed(keyCode, scanCode, modifiers))
+			return true;
+		return keyCode == GLFW.GLFW_KEY_TAB && super.keyPressed(keyCode, scanCode, modifiers);
+	}
+
+	@Override
 	public boolean mouseClicked(double mouseX, double mouseY, int button) {
+		if (suggestions != null && suggestions.mouseClicked(mouseX, mouseY))
+			return true;
 		if (menu.isSensor() && mouseX >= leftPos + 12 && mouseX <= leftPos + imageWidth - 12
 			&& mouseY >= panelTop() && mouseY <= panelBottom()) {
 			List<Node> nodes = readings();
@@ -166,6 +199,11 @@ public class ChannelScreen extends AbstractContainerScreen<ChannelMenu> {
 			g.drawString(font, "Emits redstone from the channel value:", leftPos + 12, topPos + 64, 0xC0C0C0, false);
 			g.drawString(font, "number -> 0-15, true -> 15, false/none -> 0", leftPos + 12, topPos + 78, 0x808080, false);
 		}
+
+		// Channel autocomplete: existence dot + dropdown of live channels, drawn on top of everything.
+		ChannelSuggestions.statusDot(g, channelBox);
+		if (suggestions != null)
+			suggestions.render(g, mouseX, mouseY, height);
 	}
 
 	private void renderTree(GuiGraphics g, int mouseX, int mouseY) {
