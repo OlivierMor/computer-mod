@@ -61,6 +61,24 @@
   blockquote{margin:16px 0;padding:10px 16px;background:var(--bg2);border-left:3px solid var(--border);
     border-radius:0 6px 6px 0;color:var(--muted)}
   blockquote p{margin:4px 0}
+
+  /* callouts */
+  .callout{margin:18px 0;padding:12px 16px 12px 15px;border-left:3px solid var(--border);
+    border-radius:0 8px 8px 0;background:var(--bg2)}
+  .callout .ct{font-weight:600;font-size:13px;margin-bottom:4px;letter-spacing:.2px}
+  .callout p:first-of-type{margin-top:2px}
+  .callout p:last-child{margin-bottom:0}
+  .callout pre{background:#fff}
+  .callout.try{border-left-color:var(--accent);background:var(--accent-soft)}
+  .callout.try .ct{color:var(--accent)}
+  .callout.why{border-left-color:#5b61d6;background:#eef0fb}
+  .callout.why .ct{color:#4348c4}
+  .callout.tip{border-left-color:#1a7f37;background:#eef6f0}
+  .callout.tip .ct{color:#1a7f37}
+  .callout.note{border-left-color:#3b7bbf;background:#eef4fb}
+  .callout.note .ct{color:#2f6aa8}
+  .callout.warning{border-left-color:#c99a2e;background:#fbf6e7}
+  .callout.warning .ct{color:#9a6f15}
   table{border-collapse:collapse;width:100%;margin:16px 0;font-size:13.5px}
   th,td{border:1px solid var(--border2);padding:8px 11px;text-align:left;vertical-align:top}
   th{background:var(--bg2);color:var(--txt);font-weight:600}
@@ -108,56 +126,154 @@
 <script type="text/markdown" id="docs">
 # Computer Mod
 
-Computer Mod is an addon for the Create tech mod (NeoForge 1.21.1). It adds a programmable computer
-that runs real Lua code, plus three companion pieces that connect that code to the world: a **Sensor**
-(input), a **Receiver** (output), and a handheld **Controller** (manual input). They communicate over
-named **wireless channels**.
+Computer Mod is an addon for the Create tech mod (NeoForge 1.21.1). It adds a real, programmable
+computer to Minecraft. You write a small program for it in a language called Lua, and the computer runs
+that program to watch your machines and make decisions automatically.
 
-This documentation covers the whole mod from the ground up: writing Lua even if you have never coded,
-every block and item, every function, and how to read blocks from other mods and Create addons.
+It comes with four parts:
+
+- A **Computer**: the brain that runs your program.
+- A **Sensor**: reads a block (a chest, a tank, a Create machine, almost anything) and reports what it
+  sees.
+- A **Receiver**: turns a decision from your program into a redstone signal that drives machines.
+- A **Controller**: a handheld item that lets you, the player, drive the same system by hand.
+
+You do not need to know how to code to use this mod. The whole system is designed so you can describe
+what you want in plain English to an AI like ChatGPT or Claude, paste in the program it writes, and run
+it. See [Coding with AI](#coding-with-ai). If you do want to learn, [Lua Basics](#lua-basics) starts
+from zero.
+
+## What you can build
+
+- An alarm that flashes a lamp when a chest is nearly full or a tank runs low.
+- A farm or factory that turns machines on and off based on how much they have produced.
+- A smart vehicle or contraption you steer with the keyboard, like a plane, train, or rover.
+- A dashboard where one computer collects readings from many machines and reports a summary.
+- A network of computers spread across your base that message each other.
 
 ## The model
 
-The computer is a brain. It runs Lua, does math, stores data, and reads and writes channels. It does
-not touch neighbouring blocks directly. Other pieces handle the physical world:
-
-- A **Sensor** mounts on a block and publishes everything it reads about that block to a channel.
-- The **computer** reads channels, decides what to do, and publishes values back to channels.
-- A **Receiver** converts a channel value into a redstone signal to drive machines, lamps, Create
-  gearshifts, pistons, and anything else redstone controls.
-- A **Controller** lets you, the player, drive channels by hand from your keyboard and mouse.
+The computer is purely a brain. It runs Lua, does math, stores data, and talks over named channels. It
+deliberately does not reach out and touch the blocks around it. The other parts handle the physical
+world:
 
 ```
   world  ->  [Sensor]  ->  channel  ->  [Computer]  ->  channel  ->  [Receiver]  ->  world
             reads a block   wireless     your Lua code   wireless     emits redstone
 ```
 
-Computers can also message each other over channels and store data that survives reboots.
+A **channel** is just a named wireless slot that carries a value. Sensors and the Controller write to
+channels, the computer reads and writes them, and Receivers read them. Everything in the mod is built
+on this one idea. The next page, [How It Works](#how-it-works), explains why it is designed this way,
+because understanding the model makes everything else obvious.
 
 ## Works with other mods
 
 The Sensor reads blocks generically, with no mod-specific code. It pulls standard NeoForge data (item
-inventories, fluid tanks, Forge Energy), every blockstate property, and the block entity's full NBT.
-Because almost every modded machine stores its state in NBT, you can read the state of practically any
-block from any mod, even one with no documented API. See
-[Reading Any Mod or Addon](#reading-any-mod-or-addon).
-
-## Copy for an LLM
-
-The **Copy all docs** button at the top copies this entire site as clean Markdown. Paste it into an
-LLM and ask it to write a program, for example "turn on a lamp when a tank is over half full". The
-text lists every function that exists, so the model stays within the real API.
+inventories, fluid tanks, Forge Energy), every blockstate property, and the block's full saved data
+(NBT). Because almost every modded machine stores its state in NBT, you can read practically any block
+from any mod, even one with no documented API. See [Reading Any Mod or Addon](#reading-any-mod-or-addon).
 
 ## Where to next
 
-- New here: start with [Getting Started](#getting-started).
-- Never coded: read [Lua Basics](#lua-basics).
-- Want the function list: see [API Reference](#api-reference).
-- Reading a specific machine: see [The Sensor](#the-sensor) and [Reading Any Mod or Addon](#reading-any-mod-or-addon).
+- Want to understand the idea first: read [How It Works](#how-it-works).
+- Want to build something now: jump to [Getting Started](#getting-started).
+- Not a programmer: read [Coding with AI](#coding-with-ai).
+- Want the full function list: see [API Reference](#api-reference).
+
+# How It Works
+
+This page explains the ideas behind the mod. None of it is required to build your first machine, but
+once these four ideas click, everything else in this documentation becomes obvious. Each section
+explains how a part behaves and why it was designed that way.
+
+## Idea 1: brain, senses, and hands are separate
+
+A single all-in-one "smart block" would have to know about every other mod to be useful. Create alone
+has hundreds of machines, and there are thousands of mods. That approach cannot scale.
+
+Instead this mod splits the job into three roles, like a living thing:
+
+- **Senses** (the Sensor) read the world and report raw facts.
+- A **brain** (the Computer) thinks about those facts and decides what to do.
+- **Hands** (the Receiver) carry out the decision as a redstone signal.
+
+> [!WHY]
+> Splitting the roles is what lets the computer stay simple and universal. The computer never needs to
+> know what a chest or a pump or a modded reactor is. It only ever sees plain values like numbers and
+> text on channels. All the messy work of understanding a specific block is done once, generically, by
+> the Sensor. Add a brand new mod tomorrow and the same computer can already read it.
+
+## Idea 2: channels are a shared noticeboard
+
+The parts never connect to each other with wires. They communicate through **channels**. A channel is
+a named slot on a server-wide noticeboard. Anyone can pin the latest value to a name, and anyone can
+read the latest value off that name.
+
+```
+  Sensor writes ->  [ "tank" = { fluid="water", amount=6000 } ]  <- Computer reads
+  Computer writes-> [ "pump" = true ]                            <- Receiver reads
+```
+
+A channel holds only the most recent value. If something writes to a channel twice, the new value
+replaces the old one. There is no queue and no history.
+
+> [!WHY]
+> A noticeboard decouples the parts. The Sensor does not need to know who is listening, and the
+> computer does not need to know where its commands end up. You can add a second Receiver on the same
+> channel and it just works. Keeping only the latest value is exactly what control logic wants: when
+> you ask "is the tank full right now?", you want the current answer, not a backlog of old readings.
+> Channels can also carry rich values (whole tables of data), which is far more than the single 0 to 15
+> number that normal redstone can send. See [Channels](#channels) for the details.
+
+## Idea 3: the computer is a microcontroller
+
+The computer behaves like a real microcontroller, the kind of tiny chip inside a thermostat or a
+washing machine. That comparison drives three rules that surprise people at first:
+
+- **You flash a program onto it.** Flashing burns your code permanently into the chip, like firmware.
+  It stays there forever, even through power cuts and world reloads, until you flash something else.
+- **Power only decides whether it is running, not what it runs.** Give it power and it boots up and
+  runs the flashed program from the top. Cut the power and it stops instantly.
+- **It forgets everything when it loses power.** Any variables your program created while running are
+  wiped the moment power is lost, just like the working memory of a real chip. The program itself is
+  not lost, only its temporary thoughts.
+
+> [!WHY]
+> This split between permanent code and temporary memory is what makes the computer predictable. Every
+> time it powers on, it starts from a known, clean state and runs the same program the same way. There
+> is no half-finished state left over from last time to cause mystery bugs. If you need something to
+> survive a power cut on purpose, you save it to the [disk](#api-reference), which is separate, permanent
+> storage. The three kinds of memory are explained on [The Computer](#the-computer) page.
+
+## Idea 4: your program runs on its own clock
+
+When your program loops, it does not run at Minecraft's speed of 20 steps per second. It runs on its
+own much faster clock, on its own thread, capped at a fixed number of Lua instructions per game tick
+(200,000 by default, about four million per second). Minecraft never waits for your program, and your
+program never freezes the game, no matter how busy its loop is.
+
+> [!WHY]
+> Running on a separate clock is what lets you write a normal `while true do ... end` loop without
+> lagging the server. The computer is throttled automatically, so a runaway loop can never hang
+> Minecraft. The one thing to remember is that reading and acting on the world happens in step with the
+> game, once per tick, so there is no point spinning faster than that. You pace your loops with
+> `sleep`, which the next pages explain. The full timing model is on [The Computer](#the-computer).
+
+## Putting it together
+
+Every project in this mod is the same shape: a Sensor (or a Controller) puts facts on a channel, the
+computer reads them and decides, and a Receiver turns the decision into action. Once you see that
+shape, read [Getting Started](#getting-started) to build it for real.
 
 # Getting Started
 
-This page gets a working computer running in about five minutes.
+This page gets a working computer running in about five minutes. If you have read
+[How It Works](#how-it-works), the steps will make sense. If not, you can still follow along and the
+pieces will fit together by the end.
+
+All four items are in the creative tab named Computer Mod: the Computer, Sensor, Receiver, and
+Controller.
 
 ## 1. Place and power the computer
 
@@ -170,8 +286,8 @@ power types:
   is not overstressed.
 - **Electricity (Forge Energy):** connect an FE cable or generator from a mod that provides one.
 
-When powered, the computer boots. When power is removed, it halts immediately. See
-[The Computer](#the-computer) for how this works in detail.
+When powered, the computer boots. When power is removed, it halts instantly. See
+[The Computer](#the-computer) for the full power model.
 
 ## 2. Write a program
 
@@ -192,12 +308,19 @@ print("Hello from my computer!")
 Press **Flash** to store the program in the computer permanently. It survives closing the world. If the
 computer is powered, flashing reboots it right away. Switch to the Console tab to see your message.
 
-> A program that runs top to bottom and ends shows the state FINISHED. To keep working, use a loop, as
-> shown next.
+> [!TRY]
+> Place a computer, power its cogwheel, open it, type the `print` line above, and press Flash. Open the
+> Console tab. You should see `Hello from my computer!`. Now break the cogwheel's power and the state
+> changes to OFF. Restore power and it prints again. That is a full boot.
+
+> [!NOTE]
+> A program that runs top to bottom and ends shows the state FINISHED. It is done, not broken. To keep
+> working, a program needs a loop, shown next.
 
 ## 4. Make it run continuously
 
-Most useful programs loop. Always put a `sleep` inside a forever-loop so it paces itself:
+Most useful programs loop forever. Always put a `sleep` inside a forever-loop so it runs at a sensible
+pace instead of as fast as possible:
 
 ```lua
 print("counting...")
@@ -205,7 +328,7 @@ local n = 0
 while true do
   n = n + 1
   print("tick " .. n)
-  sleep(1)        -- wait 1 second
+  sleep(1)        -- wait 1 second between counts
 end
 ```
 
@@ -227,68 +350,223 @@ while true do
 end
 ```
 
-That is the full loop: Sensor to channel to Computer to channel to Receiver. The rest of this site
-builds on these pieces.
+> [!TRY]
+> Build the three blocks above with a redstone lamp next to the Receiver. Put one item in the chest:
+> the lamp turns on. Empty the chest: the lamp turns off. You just built the full loop, Sensor to
+> channel to Computer to channel to Receiver.
+
+That shape, read a channel then decide then emit, is the heart of almost every program in this mod. The
+rest of this site builds on it. If you would rather have an AI write these programs for you, read
+[Coding with AI](#coding-with-ai) next.
+
+# Coding with AI
+
+You do not have to learn Lua to use this mod. This documentation is written so that an AI assistant
+like ChatGPT, Claude, or Gemini can read it and write correct programs for you. This page shows the
+workflow.
+
+## Why this works
+
+A general AI does not know about this mod, so on its own it would invent functions that do not exist.
+This site solves that by handing the AI the exact, complete list of everything the computer can do.
+Given that list, the AI writes programs using only real functions.
+
+## Step 1: give the AI the documentation
+
+At the top of this page is a **Copy all docs** button. Click it. That copies this entire site as plain
+text. Paste it into a new chat with your AI as the first message, with a line like:
+
+```
+Here is the full documentation for a Minecraft mod called Computer Mod. Read it.
+I will then ask you to write Lua programs for it. Only use functions that appear
+in this documentation. Do not invent any others.
+```
+
+## Step 2: describe your setup, then ask
+
+The AI cannot see your world, so tell it what you have built and what each channel is. Be concrete
+about block names, channel names, and what you want to happen.
+
+> [!TIP]
+> A good request names the channels and the goal. For example:
+>
+> "I have a Sensor on a fluid tank publishing to the channel `boiler`. I have a Receiver on the channel
+> `pump` that runs a water pump. Write a program that keeps the tank between 20% and 80% full."
+
+The AI will reply with a block of Lua. It can explain it line by line if you ask.
+
+## Step 3: flash it and run it
+
+Copy the AI's program, open the computer, paste it into the Code tab, and press Flash. Make sure the
+computer is powered. Watch the Console tab and your machines.
+
+## Step 4: when something is wrong, paste it back
+
+If the computer shows ERROR, open the Console, copy the error message, and paste it back to the AI:
+
+```
+The computer shows this error: [paste the red error line here]. Please fix the program.
+```
+
+If it runs but does the wrong thing, describe what you see: "the pump never turns off" or "the lamp
+flickers". The AI will adjust the code. This back and forth is normal and is how real programmers work
+too.
+
+## Tips for good results
+
+- **Discover field names first.** Different blocks expose different data. Put a Sensor on the block, open
+  its screen, and read the live list of fields (see [The Sensor](#the-sensor)). Tell the AI the exact
+  field names you see, such as `item_count` or `tanks`.
+- **Ask for comments.** Request that the AI add short comments so you can follow what each part does.
+- **Change one thing at a time.** If you want a tweak, ask for that one change rather than describing the
+  whole program again.
+- **Keep the docs in the chat.** Stay in the same conversation so the AI still remembers the function
+  list. If you start a fresh chat, paste the docs again.
+
+> [!NOTE]
+> The AI writes the program, but you still place the blocks, set the channel names, and supply power.
+> Think of the AI as the programmer and yourself as the engineer wiring up the machine.
 
 # The Computer
 
-The computer behaves like a microcontroller. You flash it with a program, it runs while it has power,
-and it forgets its variables the moment power is lost.
+The computer is a full block that runs your Lua program. It behaves like a microcontroller, the small
+chip found inside everyday devices. That single comparison, introduced on [How It Works](#how-it-works),
+explains everything on this page: how flashing works, why power matters, what it remembers, and how fast
+it runs.
 
-## Flashing (the program is permanent)
+## Flashing: your code is firmware
 
-- Pressing **Flash** stores your Lua source in the block itself, saved with the world.
-- Flashing while powered reboots the computer cleanly with the new code.
-- The flashed code stays until you flash something else. Cutting power does not erase it.
+Open the computer (right-click) and you get two tabs. **Code** is a text editor with syntax
+highlighting and line numbers. **Console** shows whatever your program prints, and any errors. You write
+a program in the Code tab and press **Flash**.
+
+Flashing copies your program into the block itself. Think of it as burning firmware onto a chip:
+
+- The program is stored in the block and saved with the world. It survives the computer losing power,
+  the chunk unloading, and you quitting and reloading the game.
+- It stays exactly as flashed until you flash a different program over it. Power has no effect on it.
+- Flashing while the computer is powered reboots it immediately with the new code, so you see your
+  changes right away.
+
+> [!WHY]
+> Code and power are kept separate on purpose. A real device does not forget its firmware every time
+> you unplug it, and neither does this. Flashing is a deliberate "save my program" action, while power
+> is just an on and off switch. This is why you can build a machine, flash it once, and trust it to run
+> the same way every time it powers on.
+
+## Three kinds of memory
+
+People are often surprised that a computer "forgets" things, so it is worth being precise. The computer
+has three separate stores, and they behave differently:
+
+| Store | What it holds | Survives power loss? | How you use it |
+|---|---|---|---|
+| Flash | Your program (the code) | Yes | Press Flash |
+| Disk | Data you choose to save | Yes | `disk.set` / `disk.get` (see [API Reference](#api-reference)) |
+| RAM | The variables your program makes while running | No | Normal `local` variables |
+
+RAM is wiped every time power is lost. That is by design and matches real hardware: working memory is
+volatile. If a value must outlive a power cut, such as a counter or a saved setting, write it to the
+disk. The disk is permanent storage you control, holding up to 1024 named values.
+
+> [!TIP]
+> Rule of thumb: code goes in flash automatically when you press Flash. Anything you want to remember
+> across reboots goes in the disk. Everything else lives in RAM and resets on each boot, which is usually
+> exactly what you want.
 
 ## Power
 
-The computer accepts either power type. Whichever is present runs it:
+The computer is the only block here that needs power. It runs while it has either of Create's two power
+types:
 
-| Source | How | Notes |
+| Source | How to supply it | Notes |
 |---|---|---|
-| Rotation (Create) | Drive the central cogwheel: mesh a cogwheel from the side, or run a shaft into either end of its horizontal axis | Free to run. Needs non-zero RPM and a network that is not overstressed. Imposes a small stress load. |
-| Forge Energy (FE) | Feed FE from a cable or generator into the block | Consumes a fixed amount of FE per tick, and only when there is no rotation. Rotation is preferred and free. |
+| Rotation (Create) | Drive the central cogwheel: mesh a cogwheel from the side, or run a shaft into either end of its horizontal axis | Recommended and free to run. Needs non-zero RPM and a network that is not overstressed. Adds a small stress load. |
+| Forge Energy (FE) | Feed FE from a cable or generator from a mod that provides one | Consumes a fixed amount of FE per tick, and only when there is no rotation. Rotation is preferred and free. |
 
-The computer is powered when it has rotation or is actively receiving FE. If neither is present, it is
-OFF.
+The computer is powered when the cogwheel is turning or FE is actively flowing in. If neither is true,
+it is OFF.
 
 ## Power loss is immediate
 
-Like a real microcontroller, the computer runs only while power is actually being supplied. It has a
-small internal FE buffer that smooths the incoming supply, but that buffer is not a battery: it cannot
-keep the computer running on its own. Stop driving the cogwheel, or disconnect the FE source, and the
-computer powers down within a single tick. It does not coast on stored charge.
+The computer runs only while power is actually being supplied, exactly like a chip losing its supply
+voltage. It keeps a tiny internal FE buffer to smooth the incoming current, but that buffer is not a
+battery and cannot run the computer on its own. Stop the cogwheel or disconnect the FE source and the
+computer powers down within a single game tick. It never coasts on stored charge.
 
-## Boot and halt behaviour
+> [!WHY]
+> An immediate, clean cut-off is what makes power a reliable on and off switch. If the computer kept
+> running for a while on leftover charge, you could never use a redstone-controlled clutch or a lever as
+> a real "stop" button. Because shutdown is instant and wipes RAM, cutting power is also the simplest way
+> to force a fresh restart.
 
-- **Power on:** the computer boots a fresh runtime from the flashed code. Variables (RAM) start empty
-  and the Console is cleared. The program runs from the top.
-- **Power off:** the computer halts at once and discards all variables (RAM). The last Console output
-  stays frozen on screen so you can read it. The next boot clears it.
-- **Program finishes:** if your code reaches the end with no loop, it stops at FINISHED until the next
-  power cycle.
+## The boot and halt cycle
 
-> RAM, disk, and flash are three different stores. Flash holds your code and is permanent. Disk is a
-> key/value store you control that also persists (see [API Reference](#api-reference)). RAM holds your
-> variables while running and is wiped on power loss. Put anything that must survive into `disk`.
+Each time power arrives or leaves, a clear cycle runs:
+
+- **Power on (boot):** the computer starts a fresh copy of your flashed program. RAM is empty and the
+  Console is cleared. Execution begins at the first line.
+- **While powered (running):** your program runs on its own clock (described below).
+- **Power off (halt):** the program stops at once and RAM is discarded. The last Console output is
+  frozen on screen so you can still read it. The next boot clears that frozen output.
 
 ## Run states
 
-The screen shows one of four states:
+The screen always shows one of four states:
 
 - **OFF:** no power, not running.
-- **RUNNING:** executing your program.
-- **FINISHED:** the program ended without error.
-- **ERROR:** the program crashed. The message is printed to the Console.
+- **RUNNING:** your program is executing, usually a forever-loop.
+- **FINISHED:** the program reached its end with no error. A program with no loop finishes in an instant.
+  This is success, not a fault.
+- **ERROR:** the program hit a mistake and stopped. The red error message, including the line number, is
+  printed to the Console. See [Troubleshooting and FAQ](#troubleshooting-and-faq).
 
-## Performance
+## How fast your program runs
 
-The program runs on its own thread at a fixed clock speed, measured in Lua instructions per game tick
-(default 200,000 per tick, about 4,000,000 per second, configurable). Pure computation and a
-`while true` loop run at full speed. Logic does not need to match the 20 ticks per second game rate.
-Only `sleep` and world round-trips are tick-bound. See [Patterns and Recipes](#patterns-and-recipes)
-for loop pacing.
+This is the part that most affects how you write programs, so it is worth understanding.
+
+Your program runs on its own background thread, on a fixed clock. The clock allows a set number of Lua
+instructions per game tick, 200,000 by default. A game tick is one twentieth of a second, so that is
+about four million instructions per second. Minecraft runs at 20 ticks per second no matter what, and
+your computer's clock is granted once per tick.
+
+What this means in practice:
+
+- **Pure calculation is fast.** Math, loops over tables, and building text all run at clock speed. You do
+  not need to spread work across ticks by hand.
+- **The game never waits for you, and you never freeze the game.** If your loop is busy, the clock simply
+  throttles it. A runaway `while true do end` with no `sleep` cannot hang the server.
+- **Touching the world happens once per tick.** Sensors update their channels once per tick, and a
+  Receiver reads its channel once per tick. Reading a channel in Lua is cheap and instant. Disk
+  operations (`disk.get`, `disk.set`, and so on) each cost about one tick, because they reach back into
+  the saved world. The computer handles up to 64 such disk operations per tick.
+
+### Why you should always sleep in a loop
+
+```lua
+while true do
+  -- check something and act
+  sleep(0.25)        -- pause a quarter second each pass
+end
+```
+
+> [!WHY]
+> Without a `sleep`, a forever-loop runs as fast as the clock allows, burning the computer's whole
+> instruction budget every tick to repeat work that only changes once per tick anyway. It will not crash
+> anything, but it wastes performance for no benefit, since the sensors it reads do not update faster
+> than once per tick. `sleep` hands the rest of the time back, so the computer uses almost no
+> performance while idle and your logic runs at a sensible, steady pace. A quarter to a half second is a
+> good default for most control loops. Use a shorter sleep only when you genuinely need a faster
+> reaction.
+
+`sleep(seconds)` always waits at least one tick (0.05 seconds), because that is the finest step the game
+has. `sleep(0.01)` still waits one full tick.
+
+## Limits
+
+- The Console keeps the most recent 200 lines. Older lines scroll off.
+- The disk holds up to 1024 named values.
+- The instruction budget per tick is set by config (below).
 
 ## Configuration
 
@@ -296,10 +574,10 @@ Server config file `computermod-common.toml` (NeoForge):
 
 | Key | Default | Meaning |
 |---|---|---|
-| `maxOpsPerTick` | 200000 | Lua instructions per game tick (times 20 for per second). Higher means faster compute and more CPU per running computer. |
-| `minRpm` | 1.0 | Minimum absolute RPM for a kinetically powered computer to run. |
-| `feCapacity` | 100000 | Internal Forge Energy smoothing buffer (FE). |
-| `fePerTick` | 20 | FE consumed per tick when running on electricity. Ignored while kinetically powered. |
+| `maxOpsPerTick` | 200000 | Lua instructions per game tick (times 20 for the per second rate). Higher means faster computation but more server load per running computer. |
+| `minRpm` | 1.0 | Minimum RPM for a kinetically powered computer to run. |
+| `feCapacity` | 100000 | Size of the internal FE smoothing buffer, in FE. |
+| `fePerTick` | 20 | FE consumed per tick while running on electricity. Ignored while powered by rotation. |
 
 # The Sensor
 
@@ -313,20 +591,33 @@ is removed, the Sensor pops off and drops. It mounts on any side, including wall
 
 ## What it does
 
-The Sensor scans the block it is attached to every tick and publishes the complete readings table the
-instant anything changes. Add an item, change a fluid level, or flip a blockstate, and it transmits on
-that same tick with no polling delay. If nothing changed, it stays quiet, since the channel already
-holds the latest value. Right-click the Sensor to set its channel name, which is the only setting.
+The Sensor scans the block it is attached to every tick and publishes one big table of readings to its
+channel. It publishes the instant anything changes: add an item, change a fluid level, or flip a
+blockstate, and the new readings go out that same tick with no delay. If nothing changed, it stays
+quiet, because the channel already holds the latest value. Right-click the Sensor to set its channel
+name, which is its only setting.
 
-> Because it always publishes the whole table, `channel("name")` from a sensor is always a Lua table.
-> Index into it, for example `channel("name").item_count`. It never publishes a bare value.
+> [!WHY]
+> The Sensor reads every block the same generic way, with no special code for any particular mod. It
+> gathers standard data that almost all blocks expose (inventories, tanks, energy, blockstate) plus the
+> block's entire saved data. This is the trick that lets one simple block read a chest, a Create machine,
+> and a reactor from some mod you have never heard of, all identically. The cost is that you get a table
+> of many fields rather than a single number, so your program picks out the field it cares about.
+
+Because it always publishes the whole table, `channel("name")` from a Sensor is always a Lua table. You
+index into it, for example `channel("name").item_count`. A Sensor never publishes a bare value.
 
 ## The live readings panel
 
-The Sensor's GUI shows, live, exactly what it currently sees, as a collapsible tree. Container values
-such as `state`, `items`, and `nbt` show an expand arrow. Click it to open their nested fields. This
-lets you discover which fields a given block exposes before you write any code. Scroll with the mouse
-wheel.
+The Sensor's screen shows, live, exactly what it currently sees, as a collapsible tree that refreshes a
+couple of times a second. Fields that contain more data, such as `state`, `items`, and `nbt`, show an
+arrow. Click it to expand and read the nested values inside. Scroll with the mouse wheel.
+
+> [!TRY]
+> Before writing any program, mount a Sensor on the block you want to read and open its screen. Browse
+> the tree to learn the exact field names that block offers. These names are what you use in code, and
+> what you tell an AI when [coding with AI](#coding-with-ai). Different blocks expose different fields,
+> so this is the fastest way to find out what is available.
 
 ## Reading fields
 
@@ -369,36 +660,60 @@ and it pops off if that block is removed. It reads nothing. It only outputs reds
 
 ## What it does
 
-Right-click to set a channel. The Receiver reads the latest value on that channel and emits a redstone
-signal on all sides, every tick:
+Right-click to set a channel. Every tick the Receiver reads the latest value on that channel, converts
+it to a redstone strength from 0 to 15, and emits that signal on all sides. Its built-in LED lights up
+and glows brighter as the signal rises, so you can see the output at a glance.
+
+The conversion is simple:
 
 | Channel value | Redstone output |
 |---|---|
 | a number | clamped to 0 through 15 |
 | `true` | 15 |
-| `false`, `nil`, nothing | 0 |
-| a numeric string like `"7"` | parsed, clamped to 0 through 15 |
+| `false`, `nil`, or nothing | 0 |
+| a numeric string like `"7"` | parsed, then clamped to 0 through 15 |
 | anything else, such as a table | 0 |
 
 ```lua
-emit("pump", true)   -- receiver on "pump" outputs 15
+emit("pump", true)   -- a Receiver on "pump" outputs 15
 emit("pump", 7)      -- outputs 7
 emit("pump", false)  -- outputs 0
 ```
 
-> Avoid wiring a Receiver directly to a Sensor's channel. A Sensor publishes a table, which a Receiver
-> reads as 0. The intended flow is Sensor to Computer to Receiver: the computer reads the sensor data,
-> decides, and emits a number or boolean for the Receiver to convert into redstone.
+> [!TRY]
+> Place a Receiver, set its channel to `test`, and put a redstone lamp beside it. Flash a computer with
+> `emit("test", 15)`. The lamp lights. Change it to `emit("test", 0)` and reflash: the lamp goes dark.
+> No wires between the computer and the Receiver, only the shared channel name.
 
-> For plain wireless redstone of 0 through 15 with no logic, Create's own Redstone Link already does the
-> job and is separate from this system. These channels are for rich data and computer logic.
+> [!NOTE]
+> Do not point a Receiver at a Sensor's channel directly. A Sensor publishes a table, and a Receiver
+> reads any table as 0. The intended path is Sensor to Computer to Receiver: the computer reads the rich
+> sensor data, decides, and emits a plain number or boolean that the Receiver can turn into redstone.
+
+> [!TIP]
+> If all you want is plain wireless redstone of 0 to 15 with no logic, Create's own Redstone Link
+> already does that and is separate from this mod. These channels exist for rich data and computer
+> decisions.
 
 # The Controller
 
-The Controller is a handheld item that lets you, the player, drive channels directly from your keyboard
-and mouse. It publishes to the same channels as everything else, so a key press can flip a Receiver,
-feed a value into a running program, or trigger any logic listening on that channel. It is useful for
-manual control and for testing a setup before writing code.
+The Controller is a handheld item that lets you, the player, write to channels by hand using your
+keyboard and mouse. Where a Sensor turns a block into channel values automatically, the Controller turns
+your key presses and scroll wheel into channel values directly. Because it writes to the same channels
+as everything else, anything that reads a channel (a Receiver, or a running program) responds to your
+input live.
+
+## What it is for
+
+- **Driving vehicles and contraptions.** Bind keys to the channels that control a Create contraption and
+  steer it in real time: a plane, a train, a rover, an elevator, a crane. Your keys move the channels,
+  Receivers turn those into redstone, and the contraption responds.
+- **Manual override.** Keep a key bound to the same channel a program drives, so you can take control of
+  a machine by hand when you want to.
+- **Testing without code.** Flip a channel on and off yourself to check that a Receiver, lamp, or machine
+  is wired correctly, before you write any program at all.
+- **Live tuning.** Use the scroll wheel to feed a changing number (a speed, a height, a threshold) into a
+  running program and watch the effect immediately.
 
 ## Holding it
 
@@ -433,33 +748,59 @@ Right-click to start operating. While operating:
 
 - Each bound input drives its channel. The moment you start, every binding publishes its resting value:
   `false` for hold, the remembered state for toggle, and `min` for analog.
-- A bound input's normal game function is suppressed, so a bound W key no longer walks you forward.
-- Every input you did not bind keeps working as usual. This partial passthrough is what separates the
-  Controller from Create's Linked Controller, which locks you in place.
-- A small heads-up display lists each binding and its live value.
+- A bound input's normal game function is suppressed, so a bound W key no longer walks you forward, it
+  only drives its channel.
+- Every input you did not bind keeps working as normal.
+- A small display in the corner lists each binding and its live value.
 
 Right-click again to stop. Switching away from the item also stops operating. Either way, held channels
-are released and the suppressed keys are restored.
+are released and your suppressed keys go back to normal.
 
-## How values land on channels
+> [!WHY]
+> Only the keys you bind are taken over, and everything else still works. This partial takeover is what
+> makes the Controller good for vehicles: you can bind W, A, S, D to steer your contraption while still
+> looking around with the mouse, opening your inventory, and using hotbar items normally. The moment you
+> stop operating, every key returns to its usual job, so you are never locked in.
 
-Toggle and hold publish booleans. Analog publishes numbers. These arrive on the channel exactly as if a
-computer had called `emit`, so a Receiver converts them to redstone and a computer reads them with
-`channel(name)`. Publishes are edge-triggered: a value is sent only when it actually changes.
+## How your input reaches machines
+
+Toggle and hold bindings publish `true` or `false`. Analog bindings publish a number. These land on the
+channel exactly as if a computer had called `emit`, so:
+
+- A **Receiver** on that channel turns your input into redstone immediately.
+- A **computer** can read your input with `channel(name)` and use it in its logic.
+
+The Controller only sends a value when it actually changes, which keeps it efficient.
+
+> [!TRY]
+> Bind one key in **hold** mode to a channel called `horn`. Place a Receiver on `horn` next to a note
+> block or lamp. Right-click to operate, then hold the key: the Receiver fires while held and stops when
+> you let go. You just made a manual button with no redstone wiring.
+
+### Example: a throttle a program reads
+
+Bind the scroll wheel in analog mode to `throttle` with min 0, max 15, step 1. Now your scroll wheel is
+a dial from 0 to 15. A computer can read that dial and drive a motor with it:
 
 ```lua
--- a computer reading a Controller binding on channel "throttle" (analog 0..15)
+-- read the player's scroll dial and pass it straight to a Receiver on "motor"
 while true do
   local v = channel("throttle") or 0
-  emit("motor", v)            -- pass the player's scroll value to a Receiver
+  emit("motor", v)            -- 0 = stopped, 15 = full speed
   sleep(0.1)
 end
 ```
 
+Point the `motor` Receiver at a Create speed controller or gearshift and you have a hand-throttled
+machine. Put the computer in the middle and you can add limits, smoothing, or safety cut-offs in code
+while you still steer by hand.
+
 # Lua Basics
 
 The computer runs Lua 5.1. This page teaches enough Lua to be productive even if you have never
-programmed. If you already know Lua, skip to the [API Reference](#api-reference).
+programmed. If you already know Lua, skip to the [API Reference](#api-reference). If you would rather not
+learn to code at all, [Coding with AI](#coding-with-ai) shows how to have an assistant write programs for
+you, and you can still skim this page to read what it produces.
 
 ## Comments
 
@@ -593,6 +934,12 @@ Everything the computer can call. The computer talks to the world only through t
 is no `scan`, `redstone`, `setOutput`, or `moveItems`; that work belongs to the Sensor and Receiver
 blocks.
 
+> [!NOTE]
+> Some calls are instant and some take a tick. Channel calls (`emit`, `channel`, `channels`),
+> `getLocation`, and `print` are instant, so you can use them freely. Disk calls each take about one
+> game tick, because they reach into saved storage. This matters only in tight loops; see
+> [how fast your program runs](#the-computer).
+
 ## Function index
 
 | Function | Returns | Purpose |
@@ -652,8 +999,10 @@ print("booted " .. (boots + 1) .. " times")   -- counts up across reboots
 - `disk.list()` returns an array of stored keys.
 - `disk.clear()` wipes everything.
 
-> `disk.*` calls do a quick round-trip to the server thread, so they take about one game tick each.
-> Read/write in bulk outside tight inner loops where you can.
+> [!NOTE]
+> Each `disk` call takes about one game tick, because it reaches into the world's saved data. Read what
+> you need once near the top of a loop rather than calling `disk.get` many times per pass. The computer
+> handles up to 64 disk operations per tick.
 
 ## Timing
 
@@ -685,6 +1034,17 @@ and Controllers all share the same set of channels by name. Pick any name you li
 
 - A computer's `emit(name, value)`, a Sensor, or a Controller writes the latest value.
 - A computer's `channel(name)` or a Receiver reads the latest value.
+
+> [!WHY]
+> Nothing is physically wired to anything. A writer just pins a value under a name, and any number of
+> readers pick it up by that same name. This keeps every part independent: you can move a Receiver across
+> the base, add a second one, or swap which computer drives a channel, all without touching the others.
+> The name is the only connection.
+
+> [!TIP]
+> Channel names are shared across the whole server, so two machines using the name `door` will share one
+> value. Give channels clear, specific names (`north-gate`, `boiler-pump`, `farm-3-alarm`) so different
+> projects do not collide by accident.
 
 ## Rich values beyond 0 to 15
 
@@ -923,6 +1283,32 @@ while true do
 end
 ```
 
+## Hand-steered vehicle with a safety limit
+
+This ties the whole mod together: a [Controller](#the-controller) for your hands, a computer for the
+logic, and Receivers for the machines. Bind the scroll wheel to `throttle` (analog, 0 to 15) and a key
+in hold mode to `brake`. The computer drives a `motor` Receiver, but caps the speed and forces a stop
+when you hold the brake.
+
+```lua
+local MAX = 10                          -- never exceed this, even at full scroll
+
+while true do
+  local throttle = channel("throttle") or 0
+  local braking  = (channel("brake") == true)
+
+  local speed = throttle
+  if speed > MAX then speed = MAX end   -- safety limit
+  if braking then speed = 0 end         -- brake overrides everything
+
+  emit("motor", speed)                  -- a Receiver on "motor" runs the drive
+  sleep(0.1)
+end
+```
+
+You steer by hand, but the code guarantees the contraption never runs away and always stops on the
+brake. The same shape works for a plane's throttle, a crane's lift, or an elevator's height.
+
 # Troubleshooting and FAQ
 
 ## My program does nothing and the state is OFF
@@ -959,12 +1345,62 @@ exposes. For mod-specific values, expand the `nbt` subtree. See
 That is RAM, which is wiped on power loss by design. Use `disk.*` for anything that must persist. Your
 code persists in flash.
 
+## Will a `while true` loop lag the game?
+No. Your program runs on its own throttled clock on a background thread, so it cannot freeze Minecraft
+even with no `sleep`. A `sleep` is still strongly recommended, because it stops the loop wasting
+performance repeating work that only changes once per tick. See
+[how fast your program runs](#the-computer).
+
+## My loop reacts too slowly or too fast
+The reaction speed is set by your `sleep`. A smaller value reacts faster but uses more performance.
+For most machines, `sleep(0.25)` or `sleep(0.5)` is plenty. Reading the world only updates once per
+tick (0.05s), so sleeping less than that gains nothing.
+
 ## Gotchas checklist
 - Tables are 1-indexed: use `t[1]`, not `t[0]`.
 - `0` and `""` are truthy. Only `nil` and `false` are falsey.
 - Always `sleep` inside forever-loops.
 - A Sensor always publishes a table, so index into it.
 - Use `local` for variables.
+
+# Glossary
+
+Plain-English definitions for the terms used throughout this site. If a word in another page is unclear,
+it is probably here.
+
+## Mod terms
+
+| Term | Meaning |
+|---|---|
+| Computer | The block that runs your program. The brain. |
+| Sensor | A plate that reads a block and reports what it sees on a channel. The senses. |
+| Receiver | A plate that turns a channel value into a redstone signal. The hands. |
+| Controller | A handheld item that lets you write to channels with your keyboard and mouse. |
+| Channel | A named wireless slot that holds one value. Parts share data by reading and writing channels. |
+| Flash | To save your program permanently into a computer by pressing the Flash button. |
+| Boot | What a computer does when it gains power: start your program fresh from the top. |
+| Disk | Permanent storage inside a computer for values you want to keep across reboots. |
+| RAM | A computer's temporary memory while running. Wiped on power loss. |
+| Tick | One step of the game clock, one twentieth of a second. The game runs at 20 ticks per second. |
+| RPM | Rotations per minute, the speed of a Create rotation. Powers the computer. |
+| Redstone | Minecraft's built-in wiring signal, a strength from 0 (off) to 15 (full). |
+
+## Coding terms
+
+| Term | Meaning |
+|---|---|
+| Program | The list of instructions you write for the computer to follow. |
+| Lua | The programming language the computer uses. Simple and beginner-friendly. |
+| Variable | A named box that holds a value, like `count = 5`. |
+| `local` | A keyword that makes a variable private to your program. Always use it. |
+| Number | A numeric value, such as `42` or `3.14`. |
+| String | Text, written in quotes, such as `"hello"`. |
+| Boolean | A true or false value. |
+| `nil` | The absence of a value, meaning "nothing here". |
+| Table | A collection of values, used for both lists and labelled records. Sensor readings are tables. |
+| Function | A named action you can run, such as `print(...)` or `sleep(...)`. |
+| Loop | Code that repeats. `while true do ... end` repeats forever. |
+| Comment | A note in the code starting with `--`, ignored by the computer. |
 
 # Cheat Sheet
 
@@ -1004,6 +1440,25 @@ SENSOR FIELDS (depend on block)
   state{}  analog_output                               (blockstate / comparator)
   nbt{}    <- everything a block entity saves; read any mod's state here
 ```
+
+```
+CONTROLLER (handheld)
+  left-click   open config        right-click   start/stop operating
+  toggle  key flips channel true/false
+  hold    channel true while key held
+  analog  scroll wheel moves a number through [min, max] by step
+
+TIMING
+  program runs on its own clock: 200,000 instructions/tick (~4,000,000/sec)
+  a tight loop never lags the game; always sleep() to save performance
+  channel/emit/getLocation/print = instant   disk.* = ~1 tick each
+  sleep(seconds) waits >= 1 tick (0.05s)
+
+MEMORY
+  flash  your code        permanent   (Flash button)
+  disk   saved values     permanent   (disk.set / disk.get, up to 1024 keys)
+  RAM    live variables   wiped on power loss
+```
 </script>
 <!-- ========================================================================================= -->
 
@@ -1038,6 +1493,9 @@ SENSOR FIELDS (depend on block)
   }
 
   function slug(s){return s.toLowerCase().replace(/&/g,"").replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"");}
+
+  var CALLOUT_TITLES={try:"Try it",why:"Why it works this way",note:"Note",tip:"Tip",warning:"Warning"};
+  function calloutTitle(t){ return CALLOUT_TITLES[t] || (t.charAt(0).toUpperCase()+t.slice(1)); }
 
   // ---- inline markdown ----
   function inline(s){
@@ -1083,11 +1541,18 @@ SENSOR FIELDS (depend on block)
         html+="</tbody></table>";
         continue;
       }
-      // blockquote
+      // blockquote / callout
       if(/^>\s?/.test(line)){
         var q=[];
         while(i<lines.length && /^>\s?/.test(lines[i])){ q.push(lines[i].replace(/^>\s?/,"")); i++; }
-        html+="<blockquote>"+renderBody(q)+"</blockquote>";
+        var mm=q.length?q[0].match(/^\[!(\w+)\]\s*(.*)$/):null;
+        if(mm){
+          var type=mm[1].toLowerCase(), title=mm[2]||calloutTitle(type);
+          q.shift();
+          html+='<div class="callout '+type+'"><div class="ct">'+esc(title)+'</div>'+renderBody(q)+'</div>';
+        } else {
+          html+="<blockquote>"+renderBody(q)+"</blockquote>";
+        }
         continue;
       }
       // unordered list
@@ -1134,11 +1599,11 @@ SENSOR FIELDS (depend on block)
 
   // groups for the sidebar
   var GROUPS=[
-    {name:"Introduction", titles:["Computer Mod","Getting Started"]},
+    {name:"Introduction", titles:["Computer Mod","How It Works","Getting Started","Coding with AI"]},
     {name:"Blocks & Items", titles:["The Computer","The Sensor","The Receiver","The Controller"]},
     {name:"Programming", titles:["Lua Basics","API Reference","Channels","Reading Any Mod or Addon"]},
     {name:"Cookbook", titles:["Patterns and Recipes","Worked Examples"]},
-    {name:"Reference", titles:["Troubleshooting and FAQ","Cheat Sheet"]}
+    {name:"Reference", titles:["Troubleshooting and FAQ","Glossary","Cheat Sheet"]}
   ];
 
   var byTitle={}; pages.forEach(function(p){byTitle[p.title]=p;});
