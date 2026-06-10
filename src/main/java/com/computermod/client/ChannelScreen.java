@@ -12,8 +12,8 @@ import com.computermod.content.channel.ReceiverBlockEntity;
 import com.computermod.content.channel.SensorBlockEntity;
 import com.computermod.content.channel.SensorBlockEntity.Node;
 import com.computermod.network.ConfigureChannelC2S;
+import com.computermod.network.ConfigureChunkLoadingC2S;
 import com.computermod.network.RequestChannelsC2S;
-import com.computermod.network.SetKeepLoadedC2S;
 import com.computermod.world.ChunkLoadManager;
 
 import net.minecraft.Util;
@@ -64,6 +64,7 @@ public class ChannelScreen extends AbstractContainerScreen<ChannelMenu> {
 	private EditBox channelBox;
 	private EditBox searchBox;
 	private Button keepLoadedButton;
+	private Button areaButton;
 	private ChannelSuggestions suggestions;
 	private int refreshTimer = 0;
 	private int scrollOffset = 0;
@@ -103,16 +104,33 @@ public class ChannelScreen extends AbstractContainerScreen<ChannelMenu> {
 		addRenderableWidget(Button.builder(Component.literal("Wiki ↗"), b -> openWiki())
 			.bounds(leftPos + imageWidth - 58, topPos + 16 - 16, 50, 14).build());
 
+		String role = menu.isSensor() ? "keeps publishing fresh readings" : "keeps emitting its redstone signal";
 		keepLoadedButton = Button.builder(keepLoadedLabel(), b -> {
 			if (menu.getBlockEntity() instanceof ChunkLoadManager.KeepLoaded keep)
-				PacketDistributor.sendToServer(new SetKeepLoadedC2S(menu.getBlockEntity().getBlockPos(),
-					!keep.isKeepLoaded()));
+				PacketDistributor.sendToServer(new ConfigureChunkLoadingC2S(menu.getBlockEntity().getBlockPos(),
+					!keep.isKeepLoaded(), keep.getLoadRadius()));
 		})
-			.bounds(leftPos + imageWidth - 58 - 96, topPos, 92, 14)
+			.bounds(leftPos + imageWidth - 58 - 92, topPos, 88, 14)
 			.tooltip(net.minecraft.client.gui.components.Tooltip.create(Component.literal(
-				"Force-load this block's chunks so it keeps working when no player is nearby")))
+				"Keeps this block's part of the world loaded and running even when no player is nearby, "
+					+ "so it " + role + " while you are away. Needed for far-away systems such as a "
+					+ "remote outpost or an airport. Turn it off for blocks you only use while standing "
+					+ "next to them, to save server performance.")))
 			.build();
 		addRenderableWidget(keepLoadedButton);
+
+		areaButton = Button.builder(areaLabel(), b -> {
+			if (menu.getBlockEntity() instanceof ChunkLoadManager.KeepLoaded keep)
+				PacketDistributor.sendToServer(new ConfigureChunkLoadingC2S(menu.getBlockEntity().getBlockPos(),
+					keep.isKeepLoaded(), (keep.getLoadRadius() + 1) % 3));
+		})
+			.bounds(leftPos + imageWidth - 58 - 92 - 60, topPos, 56, 14)
+			.tooltip(net.minecraft.client.gui.components.Tooltip.create(Component.literal(
+				"Size of the loaded chunk area centred on this block. 3×3 is a good default: it also "
+					+ "keeps the machines beside it running. Use 1×1 for a lone block, 5×5 for a "
+					+ "large site.")))
+			.build();
+		addRenderableWidget(areaButton);
 
 		if (menu.isSensor()) {
 			searchBox = new EditBox(font, leftPos + 12, topPos + 48, 110, 14, Component.literal("search"));
@@ -156,11 +174,20 @@ public class ChannelScreen extends AbstractContainerScreen<ChannelMenu> {
 		}
 		// reflect the server-confirmed chunk-loading state
 		keepLoadedButton.setMessage(keepLoadedLabel());
+		areaButton.setMessage(areaLabel());
+		areaButton.active = menu.getBlockEntity() instanceof ChunkLoadManager.KeepLoaded keep
+			&& keep.isKeepLoaded();
 	}
 
 	private Component keepLoadedLabel() {
 		boolean on = menu.getBlockEntity() instanceof ChunkLoadManager.KeepLoaded keep && keep.isKeepLoaded();
 		return Component.literal(on ? "Keep loaded ✔" : "Keep loaded ✘");
+	}
+
+	private Component areaLabel() {
+		int radius = menu.getBlockEntity() instanceof ChunkLoadManager.KeepLoaded keep ? keep.getLoadRadius() : 1;
+		int size = radius * 2 + 1;
+		return Component.literal("Area " + size + "×" + size);
 	}
 
 	private void openWiki() {

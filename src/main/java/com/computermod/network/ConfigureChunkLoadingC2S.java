@@ -15,34 +15,39 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
 
-/** Client -> server: toggle "Keep loaded" (chunk loading) on a computer, sensor, or receiver. */
-public record SetKeepLoadedC2S(BlockPos pos, boolean keep) implements CustomPacketPayload {
+/**
+ * Client -> server: set the chunk-loading settings of a computer, sensor, or receiver: whether it
+ * keeps its chunks loaded, and the radius of the loaded area. The server clamps the radius.
+ */
+public record ConfigureChunkLoadingC2S(BlockPos pos, boolean keepLoaded, int radius)
+	implements CustomPacketPayload {
 
-	public static final Type<SetKeepLoadedC2S> TYPE =
-		new Type<>(ResourceLocation.fromNamespaceAndPath(ComputerMod.MODID, "set_keep_loaded"));
+	public static final Type<ConfigureChunkLoadingC2S> TYPE =
+		new Type<>(ResourceLocation.fromNamespaceAndPath(ComputerMod.MODID, "configure_chunk_loading"));
 
-	public static final StreamCodec<RegistryFriendlyByteBuf, SetKeepLoadedC2S> CODEC = StreamCodec.composite(
-		BlockPos.STREAM_CODEC, SetKeepLoadedC2S::pos,
-		ByteBufCodecs.BOOL, SetKeepLoadedC2S::keep,
-		SetKeepLoadedC2S::new);
+	public static final StreamCodec<RegistryFriendlyByteBuf, ConfigureChunkLoadingC2S> CODEC = StreamCodec.composite(
+		BlockPos.STREAM_CODEC, ConfigureChunkLoadingC2S::pos,
+		ByteBufCodecs.BOOL, ConfigureChunkLoadingC2S::keepLoaded,
+		ByteBufCodecs.VAR_INT, ConfigureChunkLoadingC2S::radius,
+		ConfigureChunkLoadingC2S::new);
 
 	@Override
 	public Type<? extends CustomPacketPayload> type() {
 		return TYPE;
 	}
 
-	public static void handle(SetKeepLoadedC2S msg, IPayloadContext ctx) {
+	public static void handle(ConfigureChunkLoadingC2S msg, IPayloadContext ctx) {
 		ctx.enqueueWork(() -> {
 			Player player = ctx.player();
 			if (player.distanceToSqr(msg.pos().getCenter()) > 64.0)
 				return;
 			BlockEntity be = player.level().getBlockEntity(msg.pos());
 			if (be instanceof ComputerBlockEntity computer)
-				computer.setKeepLoaded(msg.keep());
+				computer.configureChunkLoading(msg.keepLoaded(), msg.radius());
 			else if (be instanceof SensorBlockEntity sensor)
-				sensor.setKeepLoaded(msg.keep());
+				sensor.configureChunkLoading(msg.keepLoaded(), msg.radius());
 			else if (be instanceof ReceiverBlockEntity receiver)
-				receiver.setKeepLoaded(msg.keep());
+				receiver.configureChunkLoading(msg.keepLoaded(), msg.radius());
 		});
 	}
 }

@@ -61,8 +61,12 @@ public class ComputerBlockEntity extends KineticBlockEntity implements MenuProvi
 
 	/** Persisted "flash memory": the program files, in tab order. {@code main.lua} is always first. */
 	private LinkedHashMap<String, String> files = newFlash();
-	/** Whether this computer force-loads its chunks so it keeps running with no player nearby. */
-	private boolean keepLoaded = false;
+	/** Chunk loading: on by default so the computer keeps running with no player nearby. */
+	private boolean keepLoaded = true;
+	/** Loaded-area radius in chunks (1 = 3x3). */
+	private int loadRadius = ChunkLoadManager.DEFAULT_RADIUS;
+	/** Whether this instance has pushed its chunk tickets since loading (server side). */
+	private boolean chunkTicketsApplied = false;
 	/** Internal Forge Energy buffer (persisted). */
 	private ComputerEnergyStorage energy;
 
@@ -141,6 +145,8 @@ public class ComputerBlockEntity extends KineticBlockEntity implements MenuProvi
 		super.tick();
 		if (level == null || level.isClientSide)
 			return;
+
+		applyChunkTickets();
 
 		if (isPowered()) {
 			if (runtime == null) {
@@ -295,23 +301,45 @@ public class ComputerBlockEntity extends KineticBlockEntity implements MenuProvi
 	public void destroy() {
 		// Block actually broken (not just unloaded): release any chunk tickets it owns.
 		if (keepLoaded && level instanceof net.minecraft.server.level.ServerLevel serverLevel)
-			ChunkLoadManager.setForced(serverLevel, worldPosition, false);
+			ChunkLoadManager.setForced(serverLevel, worldPosition, loadRadius, false);
 		super.destroy();
 	}
 
 	// --- Chunk loading ---
+
+	/** Push the chunk tickets once after placement/load (idempotent if they already exist). */
+	private void applyChunkTickets() {
+		if (chunkTicketsApplied || !keepLoaded)
+			return;
+		if (level instanceof net.minecraft.server.level.ServerLevel serverLevel) {
+			ChunkLoadManager.setForced(serverLevel, worldPosition, loadRadius, true);
+			chunkTicketsApplied = true;
+		}
+	}
 
 	@Override
 	public boolean isKeepLoaded() {
 		return keepLoaded;
 	}
 
-	public void setKeepLoaded(boolean keep) {
-		if (keepLoaded == keep)
+	@Override
+	public int getLoadRadius() {
+		return loadRadius;
+	}
+
+	public void configureChunkLoading(boolean keep, int radius) {
+		radius = Math.max(0, Math.min(ChunkLoadManager.MAX_RADIUS, radius));
+		if (keepLoaded == keep && loadRadius == radius)
 			return;
+		if (level instanceof net.minecraft.server.level.ServerLevel serverLevel) {
+			if (keepLoaded)
+				ChunkLoadManager.setForced(serverLevel, worldPosition, loadRadius, false);
+			if (keep)
+				ChunkLoadManager.setForced(serverLevel, worldPosition, radius, true);
+			chunkTicketsApplied = keep;
+		}
 		keepLoaded = keep;
-		if (level instanceof net.minecraft.server.level.ServerLevel serverLevel)
-			ChunkLoadManager.setForced(serverLevel, worldPosition, keep);
+		loadRadius = radius;
 		setChanged();
 		sendData();
 	}
@@ -371,6 +399,7 @@ public class ComputerBlockEntity extends KineticBlockEntity implements MenuProvi
 		}
 		compound.put("Files", fileList);
 		compound.putBoolean("KeepLoaded", keepLoaded);
+		compound.putInt("LoadRadius", loadRadius);
 		compound.putInt("Energy", energy.getEnergyStored());
 		if (!clientPacket)
 			compound.put("Disk", diskData);
@@ -399,7 +428,11 @@ public class ComputerBlockEntity extends KineticBlockEntity implements MenuProvi
 			loaded.put(MAIN_FILE, compound.getString("ProgramSource"));
 		}
 		files = sanitize(loaded);
-		keepLoaded = compound.getBoolean("KeepLoaded");
+		// Default on for blocks saved before chunk loading existed.
+		keepLoaded = !compound.contains("KeepLoaded") || compound.getBoolean("KeepLoaded");
+		loadRadius = compound.contains("LoadRadius")
+			? Math.max(0, Math.min(ChunkLoadManager.MAX_RADIUS, compound.getInt("LoadRadius")))
+			: ChunkLoadManager.DEFAULT_RADIUS;
 		energy.setStored(compound.getInt("Energy"));
 		if (!clientPacket)
 			diskData = compound.getCompound("Disk");

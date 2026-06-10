@@ -48,6 +48,13 @@ inventories, fluid tanks, Forge Energy), every blockstate property, and the bloc
 (NBT). Because almost every modded machine stores its state in NBT, you can read practically any block
 from any mod, even one with no documented API. See [Reading Any Mod or Addon](#reading-any-mod-or-addon).
 
+## Keeps running while you are away
+
+The first question most players ask: does my system stop when I leave the area or log out? **No.** The
+Computer, Sensor, and Receiver keep their surrounding chunks loaded by default, so a far-away system
+keeps computing, sensing, and acting around the clock, with no chunk-loader mod needed. It is a
+per-block setting you can adjust or turn off. See [Chunks and Staying Loaded](#chunks-and-staying-loaded).
+
 ## Where to next
 
 - Want to understand the idea first: read [How It Works](#how-it-works).
@@ -58,7 +65,7 @@ from any mod, even one with no documented API. See [Reading Any Mod or Addon](#r
 # How It Works
 
 This page explains the ideas behind the mod. None of it is required to build your first machine, but
-once these four ideas click, everything else in this documentation becomes obvious. Each section
+once these five ideas click, everything else in this documentation becomes obvious. Each section
 explains how a part behaves and why it was designed that way.
 
 ## Idea 1: brain, senses, and hands are separate
@@ -133,6 +140,21 @@ program never freezes the game, no matter how busy its loop is.
 > Minecraft. The one thing to remember is that reading and acting on the world happens in step with the
 > game, once per tick, so there is no point spinning faster than that. You pace your loops with
 > `sleep`, which the next pages explain. The full timing model is on [The Computer](#the-computer).
+
+## Idea 5: your systems do not need you nearby
+
+In Minecraft, the world only runs near players. Most automation quietly pauses the moment you walk
+away. This mod's blocks do not: the Computer, Sensor, and Receiver keep the chunks around themselves
+loaded by default, so the systems you build run around the clock.
+
+> [!WHY]
+> A mod about autonomous machines that stopped being autonomous whenever you left would be a broken
+> promise. The whole point of giving Create a brain is that the brain keeps thinking while you are off
+> doing something else: the farm controller keeps the farm fed, the beacon keeps broadcasting, the
+> alarm keeps watching. Chunk loading is the price of that promise, so it is on by default, and it is
+> a per-block choice so you can switch it off where it is not needed. The details, including what each
+> block does in an unloaded chunk if you do switch it off, are on
+> [Chunks and Staying Loaded](#chunks-and-staying-loaded).
 
 ## Putting it together
 
@@ -237,6 +259,11 @@ end
 That shape, read a channel then decide then emit, is the heart of almost every program in this mod. The
 rest of this site builds on it. If you would rather have an AI write these programs for you, read
 [Coding with AI](#coding-with-ai) next.
+
+> [!NOTE]
+> Your build keeps working when you leave. All three blocks keep their chunks loaded by default, so
+> the lamp still reacts to the chest while you are mining on the other side of the map. See
+> [Chunks and Staying Loaded](#chunks-and-staying-loaded).
 
 # Coding with AI
 
@@ -436,6 +463,13 @@ computer powers down within a single game tick. It never coasts on stored charge
 > running for a while on leftover charge, you could never use a redstone-controlled clutch or a lever as
 > a real "stop" button. Because shutdown is instant and wipes RAM, cutting power is also the simplest way
 > to force a fresh restart.
+
+## It keeps running while you are away
+
+The computer keeps its surrounding chunks loaded by default (the **Keep loaded** and **Area** buttons
+at the top of its screen), so leaving the area or logging out does not stop it. A computer only ever
+stops because its power stops, you turn Keep loaded off and walk away, or the server shuts down. The
+full story is on [Chunks and Staying Loaded](#chunks-and-staying-loaded).
 
 ## The boot and halt cycle
 
@@ -652,6 +686,10 @@ name, which is its only setting.
 Because it always publishes the whole table, `channel("name")` from a Sensor is always a Lua table. You
 index into it, for example `channel("name").item_count`. A Sensor never publishes a bare value.
 
+Like the computer, the Sensor keeps its surrounding chunks loaded by default (the **Keep loaded** and
+**Area** buttons in its screen), so its readings stay fresh even when no player has been near it for
+days. See [Chunks and Staying Loaded](#chunks-and-staying-loaded).
+
 ## The live readings panel
 
 The Sensor's screen shows, live, exactly what it currently sees, as a collapsible tree that refreshes a
@@ -726,6 +764,10 @@ The screen shows what is happening live: the latest value on the channel, the re
 became, and a 0 to 15 meter. If a machine is not responding, one glance tells you whether the problem
 is upstream (no value arriving on the channel) or downstream (a value arrives but converts to 0, for
 example because it is a table).
+
+Like the other blocks, the Receiver keeps its surrounding chunks loaded by default (the **Keep
+loaded** and **Area** buttons in its screen), so the machines it drives keep being driven while you
+are away. See [Chunks and Staying Loaded](#chunks-and-staying-loaded).
 
 The conversion is simple:
 
@@ -1176,55 +1218,79 @@ data that must persist, use the computer's [disk](#api-reference).
 # Chunks and Staying Loaded
 
 Minecraft only simulates the parts of the world near players, called loaded chunks (a chunk is a 16 by
-16 block column). Everything outside that is unloaded: frozen on disk, using no resources. Furnaces
-stop smelting, crops stop growing, and this mod's blocks pause too. This page explains exactly what
-pausing means here, and how to keep a far-away system running.
+16 column of blocks). Everything outside that is unloaded: frozen on disk, using no resources. Furnaces
+stop smelting, crops stop growing, and most machines from most mods simply pause until someone comes
+back. So the first question everyone asks about a mod like this is: **does my computer stop working
+when I walk away?**
 
-## What happens in an unloaded chunk
+**No. By default, it keeps running.** The Computer, the Sensor, and the Receiver each keep the chunks
+around themselves loaded, from the moment they are placed. A far-away factory controller keeps
+controlling, a remote sensor keeps publishing fresh readings, and a distant receiver keeps driving its
+machines, with no player anywhere near and no chunk-loader mod needed. The system you build is simply
+always on, like the rest of the mod pretends to be but rarely is.
+
+## The two settings
+
+Every Computer, Sensor, and Receiver screen has two buttons in its top bar:
+
+- **Keep loaded** (default: on). Whether this block holds its surrounding chunks loaded and running.
+  Hover over the button in game for a reminder of why you would want this.
+- **Area** (default: 3×3). The size of the loaded chunk square centred on the block: 1×1, 3×3, or 5×5
+  chunks. A chunk is 16 by 16 blocks, so the default 3×3 keeps a 48 by 48 block area alive around the
+  block.
+
+The settings are per block and saved with the world, and they survive server restarts. Breaking the
+block releases its chunks.
+
+> [!WHY]
+> The default area is 3×3 rather than just the block's own chunk because a block rarely works alone. A
+> computer needs its cogwheel power source spinning, a sensor needs the block it reads to actually
+> tick, and a receiver is pointless if the machine it powers is frozen. One chunk of margin on every
+> side means the block and its immediate machinery stay alive together, even when they happen to sit
+> on a chunk border you cannot see. Pick 1×1 only when you know everything the block needs sits in its
+> own chunk; pick 5×5 for a large site you want kept alive by a single block.
+
+## When to turn Keep loaded off
+
+Loaded chunks cost server performance: everything inside them keeps ticking, roughly as if a player
+were standing there. A handful of keep-loaded blocks is nothing; hundreds, each holding 3×3 chunks,
+add up. The honest rule:
+
+- **Leave it on** for anything that must work while you are away: beacons, remote outposts, farms,
+  factory controllers, an airport reporting to aircraft.
+- **Turn it off** for blocks you only ever use while standing next to them, such as a test bench
+  computer or a sensor you placed just to inspect a block. While you are nearby the chunks are loaded
+  anyway, so switching it off changes nothing about how they behave for you.
+
+## What happens with Keep loaded off
+
+A block with Keep loaded switched off behaves like any normal block when its chunk unloads:
 
 | Block | While its chunk is unloaded | When the chunk loads again |
 |---|---|---|
 | Computer | Powers off, exactly like a power cut: the program halts, RAM is wiped. Flash and disk are safe. | Boots `main.lua` fresh on the next tick, if powered. |
-| Sensor | Stops scanning and publishing. Its **last published value stays on the channel**, frozen. | Re-scans and re-publishes immediately. |
+| Sensor | Stops scanning and publishing. Its last published value stays on the channel, frozen. | Re-scans and re-publishes immediately. |
 | Receiver | Stops updating; its redstone output is frozen (which only matters to its neighbours, who are unloaded too). | Re-reads its channel and corrects itself within a tick. |
 
-Channels themselves do not live in chunks at all. They are server-wide: unlimited range, across
-dimensions, unaffected by loading. The one rule is that channel values are not saved to disk, so a
-server restart clears them; everything repopulates by itself as publishers come back.
+Note the sensor row: a frozen last value can be useful (a parked beacon is still correct) or
+misleading (an old tank reading looks like a live one). If a reader must know its data is fresh, keep
+the sensor loaded, or have the publisher emit a counter and treat a non-moving counter as offline.
 
-> [!NOTE]
-> The frozen last value cuts both ways. For a fixed beacon (a base broadcasting its coordinates) it is
-> exactly what you want: the position is still correct. For live readings (a tank level) it is stale
-> data, and a reader cannot tell. If a system must keep producing fresh data with no player around, it
-> needs its chunks kept loaded, which is what the toggle below is for.
+## Channels do not care about chunks at all
 
-## The Keep loaded toggle
+Channels are server-wide: unlimited range, across dimensions, completely independent of what is
+loaded. A computer in the End can read a sensor at spawn. The one lifetime rule is that channel values
+live in memory, not on disk, so a **server restart clears them**. Nothing needs your attention when
+that happens: keep-loaded blocks come back by themselves, sensors re-publish immediately, booting
+computers re-emit, and a receiver on a still-empty channel outputs 0 until the value returns,
+usually within a second.
 
-The Computer, Sensor, and Receiver screens each have a **Keep loaded** button in the top right. Switch
-it on and the block holds its surrounding chunks loaded and running, players nearby or not:
+## Example: a far-away airport
 
-- A keep-loaded computer keeps executing its program.
-- A keep-loaded sensor keeps publishing fresh readings.
-- A keep-loaded receiver keeps converting its channel into redstone for the machines around it.
-
-The setting is per block, saved with the world, and survives server restarts. Breaking the block
-releases its chunks. By default each block keeps a 3 by 3 area of chunks loaded around itself, so a
-computer's power source (its cogwheel network) keeps spinning with it; a server config can shrink that
-to a single chunk or disable the feature entirely.
-
-> [!WHY]
-> Chunk loading is opt-in per block rather than automatic because loaded chunks cost server
-> performance: everything in them keeps ticking. Most computers stand next to the machines they manage
-> and simply pause with them, which costs nothing and changes nothing. The toggle is for the deliberate
-> few that must run unattended.
-
-## Example: a far-away airport beacon
-
-An airport on the far side of the map should keep reporting vectors to approaching aircraft, even when
-nobody is near it.
-
-1. At the airport, place a computer, give it power, and switch **Keep loaded** on.
-2. Flash it with a beacon program:
+An airport on the far side of the map should keep reporting to approaching aircraft even when nobody
+has been near it for days. With the defaults, this already works: place a computer at the airport,
+power it, and flash a beacon program. Its 3×3 loaded area keeps its power spinning and any sensors and
+receivers on the site alive with it.
 
 ```lua
 -- the airport announces itself forever
@@ -1237,7 +1303,7 @@ while true do
 end
 ```
 
-3. Any aircraft's computer, anywhere in the world, can now compute its approach vector live:
+Any aircraft computer, anywhere in the world, computes its approach live:
 
 ```lua
 local me = getLocation()
@@ -1250,25 +1316,8 @@ if port then
 end
 ```
 
-If the airport also has sensors (a runway occupancy sensor, a fuel tank) and receivers (runway lights),
-switch Keep loaded on for those too, or place them within the computer's loaded area. The whole site
-then runs as if a player were standing on it.
-
-> [!TIP]
-> One keep-loaded block already covers a 3 by 3 chunk area (48 by 48 blocks) by default. A compact
-> airport needs only its computer toggled on, with the sensors, receivers, and power inside that area.
-
-## Performance and server settings
-
-Two entries in the server config (`computermod-common.toml`) govern this feature:
-
-| Key | Default | Meaning |
-|---|---|---|
-| `allowChunkLoading` | true | Master switch. Off drops every Keep loaded ticket on the next world load. |
-| `chunkLoadRadius` | 1 | Chunk radius kept loaded around a toggled block. 0 = its own chunk only, 1 = 3x3, 2 = 5x5. |
-
-Each keep-loaded block is roughly as costly as a player standing in that spot, so use the toggle where
-it earns its keep, not on every machine.
+If the airport outgrows the 3×3 area, set the computer's Area to 5×5, or give the far corner its own
+keep-loaded sensor. One keep-loaded block per cluster of machinery is the tidy way to build.
 
 # Reading Any Mod or Addon
 
@@ -1510,6 +1559,12 @@ brake. The same shape works for a plane's throttle, a crane's lift, or an elevat
 
 # Troubleshooting and FAQ
 
+## Does my system stop when I walk away or log out?
+No. The Computer, Sensor, and Receiver keep their surrounding chunks loaded by default, so everything
+keeps running around the clock. If a far-away system seems dead, check that nobody switched **Keep
+loaded** off in its screen, and that its power source sits inside the loaded **Area** (3×3 chunks
+around the block by default). See [Chunks and Staying Loaded](#chunks-and-staying-loaded).
+
 ## My program does nothing and the state is OFF
 The computer has no power. Drive its central cogwheel (mesh a cogwheel, or run a shaft into its
 horizontal axis), or supply Forge Energy. Check the state shown on the screen.
@@ -1529,7 +1584,8 @@ both power inputs.
 
 ## `channel("x")` is nil
 Nothing is publishing on that channel yet. Check that the Sensor's channel name matches exactly, that
-the Sensor is placed and mounted in the world, and that the publisher is running.
+the Sensor is placed and mounted in the world, and that the publisher is running. Right after a server
+restart all channels start empty and refill within about a second as publishers come back.
 
 ## My Receiver always outputs 0
 It is probably wired straight to a Sensor's channel, which carries a table. Route it through the
@@ -1595,6 +1651,8 @@ it is probably here.
 | Tick | One step of the game clock, one twentieth of a second. The game runs at 20 ticks per second. |
 | RPM | Rotations per minute, the speed of a Create rotation. Powers the computer. |
 | Redstone | Minecraft's built-in wiring signal, a strength from 0 (off) to 15 (full). |
+| Chunk | A 16 by 16 column of blocks, the unit Minecraft loads and simulates. Unloaded chunks are frozen. |
+| Keep loaded | The per-block setting (on by default) that makes a Computer, Sensor, or Receiver hold its chunks loaded so it keeps running with no player nearby. |
 
 ## Coding terms
 
@@ -1650,6 +1708,11 @@ FILES
 EDITOR
   Ctrl+S flash   Ctrl+F find   Ctrl+Z/Y undo/redo   Ctrl+/ comment   Ctrl+D duplicate
   Tab/Shift+Tab indent selection   sensor GUI: click a value to copy its Lua path
+
+CHUNKS
+  all three blocks keep their chunks loaded by default -> systems run while you are away
+  per block: Keep loaded on/off + Area 1x1 / 3x3 (default) / 5x5 chunks
+  channels are global (any distance, any dimension); server restart clears values (they refill)
 
 SENSOR FIELDS (depend on block)
   block  is_air  has_block_entity

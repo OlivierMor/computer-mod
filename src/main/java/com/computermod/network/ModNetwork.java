@@ -13,7 +13,8 @@ public class ModNetwork {
 		registrar.playToServer(ConfigureControllerC2S.TYPE, ConfigureControllerC2S.CODEC, ConfigureControllerC2S::handle);
 		registrar.playToServer(RequestChannelsC2S.TYPE, RequestChannelsC2S.CODEC, RequestChannelsC2S::handle);
 		registrar.playToServer(ClearTerminalC2S.TYPE, ClearTerminalC2S.CODEC, ClearTerminalC2S::handle);
-		registrar.playToServer(SetKeepLoadedC2S.TYPE, SetKeepLoadedC2S.CODEC, SetKeepLoadedC2S::handle);
+		registrar.playToServer(ConfigureChunkLoadingC2S.TYPE, ConfigureChunkLoadingC2S.CODEC,
+			ConfigureChunkLoadingC2S::handle);
 		registrar.playToClient(ChannelListS2C.TYPE, ChannelListS2C.CODEC, ChannelListS2C::handle);
 	}
 

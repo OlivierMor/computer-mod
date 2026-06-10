@@ -25,6 +25,10 @@ world -> [Sensor] -> channel -> [Computer] -> channel -> [Receiver] -> world
 Because the Sensor reads blocks through standard capabilities, blockstate, and NBT, it works with
 any correctly built mod or Create addon, with no integration code.
 
+All three blocks keep their surrounding chunks loaded by default (a per-block setting with a
+selectable area), so the systems you build keep running while you are on the other side of the world
+or offline. No chunk-loader mod required.
+
 ## Documentation
 
 The full documentation site lives in [`docs/`](docs/) (a single self-contained `index.html`, also

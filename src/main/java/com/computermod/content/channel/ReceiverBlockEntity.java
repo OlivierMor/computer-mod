@@ -35,8 +35,12 @@ public class ReceiverBlockEntity extends SmartBlockEntity
 
 	private String channel = "";
 	private int output = 0;
-	/** Whether this receiver force-loads its chunks so it keeps emitting with no player nearby. */
-	private boolean keepLoaded = false;
+	/** Chunk loading: on by default so the receiver keeps emitting with no player nearby. */
+	private boolean keepLoaded = true;
+	/** Loaded-area radius in chunks (1 = 3x3). */
+	private int loadRadius = ChunkLoadManager.DEFAULT_RADIUS;
+	/** Whether this instance has pushed its chunk tickets since loading (server side). */
+	private boolean chunkTicketsApplied = false;
 	/** Short text preview of the latest channel value, synced for the GUI. */
 	private String valuePreview = "";
 	private int previewTimer = 0;
@@ -53,6 +57,7 @@ public class ReceiverBlockEntity extends SmartBlockEntity
 		super.tick();
 		if (level == null || level.isClientSide)
 			return;
+		applyChunkTickets();
 		Object value = channel.isEmpty() ? null : ChannelBus.get().read(channel);
 		if (!channel.isEmpty())
 			ChannelDirectory.get().touch(channel, ChannelDirectory.Kind.RECEIVER, worldPosition, level.getGameTime());
@@ -112,8 +117,18 @@ public class ReceiverBlockEntity extends SmartBlockEntity
 	public void destroy() {
 		ChannelDirectory.get().forget(worldPosition);
 		if (keepLoaded && level instanceof net.minecraft.server.level.ServerLevel serverLevel)
-			ChunkLoadManager.setForced(serverLevel, worldPosition, false);
+			ChunkLoadManager.setForced(serverLevel, worldPosition, loadRadius, false);
 		super.destroy();
+	}
+
+	/** Push the chunk tickets once after placement/load (idempotent if they already exist). */
+	private void applyChunkTickets() {
+		if (chunkTicketsApplied || !keepLoaded)
+			return;
+		if (level instanceof net.minecraft.server.level.ServerLevel serverLevel) {
+			ChunkLoadManager.setForced(serverLevel, worldPosition, loadRadius, true);
+			chunkTicketsApplied = true;
+		}
 	}
 
 	@Override
@@ -121,12 +136,24 @@ public class ReceiverBlockEntity extends SmartBlockEntity
 		return keepLoaded;
 	}
 
-	public void setKeepLoaded(boolean keep) {
-		if (keepLoaded == keep)
+	@Override
+	public int getLoadRadius() {
+		return loadRadius;
+	}
+
+	public void configureChunkLoading(boolean keep, int radius) {
+		radius = Math.max(0, Math.min(ChunkLoadManager.MAX_RADIUS, radius));
+		if (keepLoaded == keep && loadRadius == radius)
 			return;
+		if (level instanceof net.minecraft.server.level.ServerLevel serverLevel) {
+			if (keepLoaded)
+				ChunkLoadManager.setForced(serverLevel, worldPosition, loadRadius, false);
+			if (keep)
+				ChunkLoadManager.setForced(serverLevel, worldPosition, radius, true);
+			chunkTicketsApplied = keep;
+		}
 		keepLoaded = keep;
-		if (level instanceof net.minecraft.server.level.ServerLevel serverLevel)
-			ChunkLoadManager.setForced(serverLevel, worldPosition, keep);
+		loadRadius = radius;
 		setChanged();
 		sendData();
 	}
@@ -162,6 +189,7 @@ public class ReceiverBlockEntity extends SmartBlockEntity
 		compound.putString("Channel", channel);
 		compound.putInt("Output", output);
 		compound.putBoolean("KeepLoaded", keepLoaded);
+		compound.putInt("LoadRadius", loadRadius);
 		if (clientPacket)
 			compound.putString("Preview", valuePreview);
 	}
@@ -171,7 +199,11 @@ public class ReceiverBlockEntity extends SmartBlockEntity
 		super.read(compound, registries, clientPacket);
 		channel = compound.getString("Channel");
 		output = compound.getInt("Output");
-		keepLoaded = compound.getBoolean("KeepLoaded");
+		// Default on for blocks saved before chunk loading existed.
+		keepLoaded = !compound.contains("KeepLoaded") || compound.getBoolean("KeepLoaded");
+		loadRadius = compound.contains("LoadRadius")
+			? Math.max(0, Math.min(ChunkLoadManager.MAX_RADIUS, compound.getInt("LoadRadius")))
+			: ChunkLoadManager.DEFAULT_RADIUS;
 		if (clientPacket)
 			valuePreview = compound.getString("Preview");
 	}

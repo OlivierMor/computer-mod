@@ -57,6 +57,8 @@ A microcontroller block for the Minecraft mod **Create** (NeoForge 1.21.1):
   run a shaft into either end of its axis) and/or Forge Energy (FE) through the copper plate on top.
 - The program runs **continuously on its own thread**; `while true do ... end` loops are fine.
 - Run states (status bar): `OFF`, `RUNNING`, `FINISHED` (program returned), `ERROR` (crashed).
+- The computer, sensor and receiver **keep their chunks loaded by default** (a per-block GUI setting
+  with a selectable area), so programs keep running while players are far away or offline.
 
 ---
 
@@ -349,6 +351,9 @@ end
 - `0` is truthy in Lua; only `nil`/`false` are falsey.
 - Variables reset on power loss (RAM); use `disk` for data that must persist; code persists (flash).
 - Each computer has its own files; `require` only sees files flashed onto that computer.
+- Systems keep running while players are away (the blocks chunk-load themselves by default). A server
+  restart clears all channel values; publishers refill them within about a second, so guard reads with
+  `or` defaults / nil checks as usual.
 - Put `sleep` in every forever-loop.
 - A program with no loop runs once and stops (`FINISHED`).
 

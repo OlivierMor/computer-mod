@@ -46,8 +46,12 @@ public class SensorBlockEntity extends SmartBlockEntity
 	public record Node(int depth, String key, String value, boolean container) {}
 
 	private String channel = "";
-	/** Whether this sensor force-loads its chunks so it keeps publishing with no player nearby. */
-	private boolean keepLoaded = false;
+	/** Chunk loading: on by default so the sensor keeps publishing with no player nearby. */
+	private boolean keepLoaded = true;
+	/** Loaded-area radius in chunks (1 = 3x3). */
+	private int loadRadius = ChunkLoadManager.DEFAULT_RADIUS;
+	/** Whether this instance has pushed its chunk tickets since loading (server side). */
+	private boolean chunkTicketsApplied = false;
 	private int displayTimer = 0;
 	/** Last table published to the channel; used to publish only when something actually changed. */
 	private Map<String, Object> lastPublished = null;
@@ -67,6 +71,8 @@ public class SensorBlockEntity extends SmartBlockEntity
 		super.tick();
 		if (level == null || level.isClientSide)
 			return;
+
+		applyChunkTickets();
 
 		Direction facing = SensorBlock.getFacing(getBlockState());
 		BlockPos target = worldPosition.relative(facing);
@@ -156,8 +162,18 @@ public class SensorBlockEntity extends SmartBlockEntity
 			ChannelBus.get().publish(channel, null);
 		ChannelDirectory.get().forget(worldPosition);
 		if (keepLoaded && level instanceof net.minecraft.server.level.ServerLevel serverLevel)
-			ChunkLoadManager.setForced(serverLevel, worldPosition, false);
+			ChunkLoadManager.setForced(serverLevel, worldPosition, loadRadius, false);
 		super.destroy();
+	}
+
+	/** Push the chunk tickets once after placement/load (idempotent if they already exist). */
+	private void applyChunkTickets() {
+		if (chunkTicketsApplied || !keepLoaded)
+			return;
+		if (level instanceof net.minecraft.server.level.ServerLevel serverLevel) {
+			ChunkLoadManager.setForced(serverLevel, worldPosition, loadRadius, true);
+			chunkTicketsApplied = true;
+		}
 	}
 
 	@Override
@@ -165,12 +181,24 @@ public class SensorBlockEntity extends SmartBlockEntity
 		return keepLoaded;
 	}
 
-	public void setKeepLoaded(boolean keep) {
-		if (keepLoaded == keep)
+	@Override
+	public int getLoadRadius() {
+		return loadRadius;
+	}
+
+	public void configureChunkLoading(boolean keep, int radius) {
+		radius = Math.max(0, Math.min(ChunkLoadManager.MAX_RADIUS, radius));
+		if (keepLoaded == keep && loadRadius == radius)
 			return;
+		if (level instanceof net.minecraft.server.level.ServerLevel serverLevel) {
+			if (keepLoaded)
+				ChunkLoadManager.setForced(serverLevel, worldPosition, loadRadius, false);
+			if (keep)
+				ChunkLoadManager.setForced(serverLevel, worldPosition, radius, true);
+			chunkTicketsApplied = keep;
+		}
 		keepLoaded = keep;
-		if (level instanceof net.minecraft.server.level.ServerLevel serverLevel)
-			ChunkLoadManager.setForced(serverLevel, worldPosition, keep);
+		loadRadius = radius;
 		setChanged();
 		sendData();
 	}
@@ -191,6 +219,7 @@ public class SensorBlockEntity extends SmartBlockEntity
 		super.write(compound, registries, clientPacket);
 		compound.putString("Channel", channel);
 		compound.putBoolean("KeepLoaded", keepLoaded);
+		compound.putInt("LoadRadius", loadRadius);
 		if (clientPacket) {
 			ListTag lines = new ListTag();
 			for (Node node : readings) {
@@ -209,7 +238,11 @@ public class SensorBlockEntity extends SmartBlockEntity
 	protected void read(CompoundTag compound, HolderLookup.Provider registries, boolean clientPacket) {
 		super.read(compound, registries, clientPacket);
 		channel = compound.getString("Channel");
-		keepLoaded = compound.getBoolean("KeepLoaded");
+		// Default on for blocks saved before chunk loading existed.
+		keepLoaded = !compound.contains("KeepLoaded") || compound.getBoolean("KeepLoaded");
+		loadRadius = compound.contains("LoadRadius")
+			? Math.max(0, Math.min(ChunkLoadManager.MAX_RADIUS, compound.getInt("LoadRadius")))
+			: ChunkLoadManager.DEFAULT_RADIUS;
 		if (clientPacket) {
 			readings.clear();
 			ListTag lines = compound.getList("Readings", Tag.TAG_COMPOUND);

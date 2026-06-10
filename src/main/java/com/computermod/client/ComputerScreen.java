@@ -7,8 +7,8 @@ import java.util.List;
 import com.computermod.content.computer.ComputerBlockEntity;
 import com.computermod.content.computer.ComputerMenu;
 import com.computermod.network.ClearTerminalC2S;
+import com.computermod.network.ConfigureChunkLoadingC2S;
 import com.computermod.network.FlashProgramC2S;
-import com.computermod.network.SetKeepLoadedC2S;
 
 import net.minecraft.Util;
 import net.minecraft.client.gui.GuiGraphics;
@@ -55,6 +55,7 @@ public class ComputerScreen extends AbstractContainerScreen<ComputerMenu> {
 	private Button copyButton;
 	private Button clearButton;
 	private Button keepLoadedButton;
+	private Button areaButton;
 	private int consoleScroll = 0; // lines scrolled up from the bottom
 
 	/** Working copy of the filesystem being edited (kept across init() calls / window resizes). */
@@ -153,15 +154,30 @@ public class ComputerScreen extends AbstractContainerScreen<ComputerMenu> {
 		addRenderableWidget(Button.builder(Component.literal("Wiki ↗"), b -> openWiki())
 			.bounds(leftPos + imageWidth - 58, topPos + 16, 50, 16).build());
 
-		keepLoadedButton = Button.builder(keepLoadedLabel(), b -> {
-			boolean target = !menu.getBlockEntity().isKeepLoaded();
-			PacketDistributor.sendToServer(new SetKeepLoadedC2S(menu.getBlockEntity().getBlockPos(), target));
-		})
-			.bounds(leftPos + imageWidth - 58 - 96, topPos + 16, 92, 16)
+		ComputerBlockEntity be = menu.getBlockEntity();
+		keepLoadedButton = Button.builder(keepLoadedLabel(), b ->
+			PacketDistributor.sendToServer(new ConfigureChunkLoadingC2S(be.getBlockPos(),
+				!be.isKeepLoaded(), be.getLoadRadius())))
+			.bounds(leftPos + imageWidth - 58 - 92, topPos + 16, 88, 16)
 			.tooltip(net.minecraft.client.gui.components.Tooltip.create(Component.literal(
-				"Force-load this computer's chunks so it keeps running when no player is nearby")))
+				"Keeps this computer's part of the world loaded and running even when no player is "
+					+ "nearby, so it never reboots or pauses while you are away. Needed for anything "
+					+ "that must work at a distance: a beacon broadcasting coordinates, a remote farm "
+					+ "controller, an airport reporting to aircraft. Turn it off for machines you only "
+					+ "use while standing next to them, to save server performance.")))
 			.build();
 		addRenderableWidget(keepLoadedButton);
+
+		areaButton = Button.builder(areaLabel(), b ->
+			PacketDistributor.sendToServer(new ConfigureChunkLoadingC2S(be.getBlockPos(),
+				be.isKeepLoaded(), (be.getLoadRadius() + 1) % 3)))
+			.bounds(leftPos + imageWidth - 58 - 92 - 60, topPos + 16, 56, 16)
+			.tooltip(net.minecraft.client.gui.components.Tooltip.create(Component.literal(
+				"Size of the loaded chunk area centred on this block. 3×3 is a good default: it also "
+					+ "keeps the power source and machines beside it running. Use 1×1 for a lone "
+					+ "block, 5×5 for a large site.")))
+			.build();
+		addRenderableWidget(areaButton);
 
 		findBox = new EditBox(font, contentRight() - 150, topPos + 19, 110, 14, Component.literal("find"));
 		findBox.setHint(Component.literal("find…"));
@@ -442,10 +458,17 @@ public class ComputerScreen extends AbstractContainerScreen<ComputerMenu> {
 			flashedTicks--;
 		// reflect the server-confirmed chunk-loading state
 		keepLoadedButton.setMessage(keepLoadedLabel());
+		areaButton.setMessage(areaLabel());
+		areaButton.active = menu.getBlockEntity().isKeepLoaded();
 	}
 
 	private Component keepLoadedLabel() {
 		return Component.literal(menu.getBlockEntity().isKeepLoaded() ? "Keep loaded ✔" : "Keep loaded ✘");
+	}
+
+	private Component areaLabel() {
+		int size = menu.getBlockEntity().getLoadRadius() * 2 + 1;
+		return Component.literal("Area " + size + "×" + size);
 	}
 
 	// --- rendering ---
