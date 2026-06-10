@@ -2009,13 +2009,20 @@ MEMORY
   // groups for the sidebar
   var GROUPS=[
     {name:"Introduction", titles:["Computer Mod","How It Works","Getting Started","Coding with AI"]},
-    {name:"Blocks & Items", titles:["The Computer","The Sensor","The Receiver","The Controller"]},
-    {name:"Programming", titles:["Lua Basics","API Reference","Channels","Reading Any Mod or Addon"]},
+    {name:"Blocks & Items", titles:["The Computer","The Sensor","The Receiver","The Controller","Chunks and Staying Loaded"]},
+    {name:"Programming", titles:["Lua Basics","Files and Libraries","API Reference","Channels","Reading Any Mod or Addon"]},
     {name:"Cookbook", titles:["Patterns and Recipes","Worked Examples"]},
     {name:"Reference", titles:["Troubleshooting and FAQ","Glossary","Cheat Sheet"]}
   ];
 
   var byTitle={}; pages.forEach(function(p){byTitle[p.title]=p;});
+
+  // Safety net: any page not claimed by a group above still gets a sidebar entry,
+  // so a newly added page can never silently vanish from navigation.
+  var claimed={};
+  GROUPS.forEach(function(g){ g.titles.forEach(function(t){ claimed[t]=true; }); });
+  var unclaimed=pages.filter(function(p){ return !claimed[p.title]; }).map(function(p){ return p.title; });
+  if(unclaimed.length) GROUPS.push({name:"More", titles:unclaimed});
 
   // render pages
   var main=document.getElementById("main");
