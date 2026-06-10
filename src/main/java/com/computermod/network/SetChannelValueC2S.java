@@ -55,6 +55,9 @@ public record SetChannelValueC2S(String channel, boolean numeric, double number,
 			if (!holdsControllerFor(player, msg.channel()))
 				return;
 			ChannelBus.get().publish(msg.channel(), msg.numeric() ? msg.number() : msg.flag());
+			com.computermod.channel.ChannelDirectory.get().touch(msg.channel(),
+				com.computermod.channel.ChannelDirectory.Kind.CONTROLLER, player.getUUID(),
+				player.level().getGameTime());
 		});
 	}
 

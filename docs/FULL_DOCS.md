@@ -167,8 +167,10 @@ When powered, the computer boots. When power is removed, it halts instantly. See
 
 Right-click the computer to open its screen. It has two tabs:
 
-- **Code** is a text editor with a cursor, selection, copy and paste, Lua syntax highlighting, and line
-  numbers.
+- **Code** is a proper little code editor: cursor and selection, copy and paste, undo and redo, search,
+  Lua syntax highlighting, and line numbers. Above the editor sits a row of file tabs. A fresh computer
+  has one file, `main.lua`, which is the one that runs. You can add more files later (see
+  [Files and Libraries](#files-and-libraries)); for now, one is all you need.
 - **Console** shows `print(...)` output and errors.
 
 Type a first program in the Code tab:
@@ -179,8 +181,11 @@ print("Hello from my computer!")
 
 ## 3. Flash it
 
-Press **Flash** to store the program in the computer permanently. It survives closing the world. If the
-computer is powered, flashing reboots it right away. Switch to the Console tab to see your message.
+Press **Flash** (or Ctrl+S) to store the program in the computer permanently. It survives closing the
+world. If the computer is powered, flashing reboots it right away. Switch to the Console tab to see
+your message. While you have edits that are not flashed yet, the status bar shows an amber
+"unflashed changes" note and the file tab shows a dot, so you always know whether the block is running
+the code you are looking at.
 
 > [!TRY]
 > Place a computer, power its cogwheel, open it, type the `print` line above, and press Flash. Open the
@@ -256,27 +261,47 @@ I will then ask you to write Lua programs for it. Only use functions that appear
 in this documentation. Do not invent any others.
 ```
 
-## Step 2: describe your setup, then ask
+## Step 2: show the AI what your sensor sees
 
-The AI cannot see your world, so tell it what you have built and what each channel is. Be concrete
-about block names, channel names, and what you want to happen.
+The AI cannot see your world, but your Sensor can, and its screen has a button made exactly for this.
+Open the Sensor on the block you care about and press **Copy**. That copies everything the sensor
+currently sees, every field with its live value, as plain text. Paste it into the chat. Now the AI
+knows the exact field names and what their values look like, and it does not have to guess.
+
+```
+sensor on channel "boiler":
+  block = create:fluid_tank
+  tanks = [1 entry]
+    #1 = {3 fields}
+      fluid = minecraft:water
+      amount = 6000
+      capacity = 16000
+  ...
+```
+
+## Step 3: describe your setup, then ask
+
+Tell it what you have built and what each channel is. Be concrete about block names, channel names,
+and what you want to happen.
 
 > [!TIP]
 > A good request names the channels and the goal. For example:
 >
-> "I have a Sensor on a fluid tank publishing to the channel `boiler`. I have a Receiver on the channel
-> `pump` that runs a water pump. Write a program that keeps the tank between 20% and 80% full."
+> "I have a Sensor on a fluid tank publishing to the channel `boiler` (its readings are pasted above).
+> I have a Receiver on the channel `pump` that runs a water pump. Write a program that keeps the tank
+> between 20% and 80% full."
 
 The AI will reply with a block of Lua. It can explain it line by line if you ask.
 
-## Step 3: flash it and run it
+## Step 4: flash it and run it
 
 Copy the AI's program, open the computer, paste it into the Code tab, and press Flash. Make sure the
 computer is powered. Watch the Console tab and your machines.
 
-## Step 4: when something is wrong, paste it back
+## Step 5: when something is wrong, paste it back
 
-If the computer shows ERROR, open the Console, copy the error message, and paste it back to the AI:
+If the computer shows ERROR, open the Console, press **Copy** to grab its contents, and paste it back
+to the AI:
 
 ```
 The computer shows this error: [paste the red error line here]. Please fix the program.
@@ -288,9 +313,11 @@ too.
 
 ## Tips for good results
 
-- **Discover field names first.** Different blocks expose different data. Put a Sensor on the block, open
-  its screen, and read the live list of fields (see [The Sensor](#the-sensor)). Tell the AI the exact
-  field names you see, such as `item_count` or `tanks`.
+- **Copy exact field paths.** In the Sensor screen, clicking any value copies the Lua expression that
+  reads it, such as `channel("tank").tanks[1].amount`. Paste that into your message and the AI will use
+  precisely the right path.
+- **Re-copy the tree when the setup changes.** If you point the Sensor at a different block, paste the
+  new tree (Step 2) so the AI works from current fields, not remembered ones.
 - **Ask for comments.** Request that the AI add short comments so you can follow what each part does.
 - **Change one thing at a time.** If you want a tweak, ask for that one change rather than describing the
   whole program again.
@@ -310,23 +337,59 @@ it runs.
 
 ## Flashing: your code is firmware
 
-Open the computer (right-click) and you get two tabs. **Code** is a text editor with syntax
-highlighting and line numbers. **Console** shows whatever your program prints, and any errors. You write
-a program in the Code tab and press **Flash**.
+Open the computer (right-click) and you get two tabs. **Code** is the editor, described below.
+**Console** shows whatever your program prints, and any errors. You write a program in the Code tab and
+press **Flash** (or Ctrl+S).
 
-Flashing copies your program into the block itself. Think of it as burning firmware onto a chip:
+Flashing copies your files into the block itself. Think of it as burning firmware onto a chip:
 
 - The program is stored in the block and saved with the world. It survives the computer losing power,
   the chunk unloading, and you quitting and reloading the game.
 - It stays exactly as flashed until you flash a different program over it. Power has no effect on it.
 - Flashing while the computer is powered reboots it immediately with the new code, so you see your
   changes right away.
+- Edits you have typed but not flashed exist only on your screen. The status bar shows an amber
+  "unflashed changes" note and each edited file tab shows a dot until you press Flash.
 
 > [!WHY]
 > Code and power are kept separate on purpose. A real device does not forget its firmware every time
 > you unplug it, and neither does this. Flashing is a deliberate "save my program" action, while power
 > is just an on and off switch. This is why you can build a machine, flash it once, and trust it to run
 > the same way every time it powers on.
+
+## The editor
+
+The Code tab is a small IDE built for writing Lua comfortably inside Minecraft:
+
+- **Editing:** full cursor and selection control, copy, cut, paste, and unlimited undo and redo.
+  Double-click selects a word, triple-click selects a line.
+- **Search:** Ctrl+F opens a find bar that highlights every match and shows a count. Enter jumps to the
+  next match, Shift+Enter to the previous, Escape closes it.
+- **Code helpers:** Lua keywords, strings, numbers, comments, and the mod's own functions are coloured.
+  New lines copy the previous indentation and indent further after `then`, `do`, and `function`.
+- **The status bar** along the bottom shows the run state, the current error message if the program
+  crashed, your cursor position, and whether your edits have been flashed yet.
+
+| Shortcut | Action |
+|---|---|
+| Ctrl+S | Flash |
+| Ctrl+F | Find (Enter next, Shift+Enter previous) |
+| Ctrl+Z / Ctrl+Y | Undo / redo |
+| Ctrl+C, Ctrl+X, Ctrl+V, Ctrl+A | Copy, cut, paste, select all |
+| Ctrl+D | Duplicate the current line or selection |
+| Ctrl+/ | Comment or uncomment the selected lines |
+| Tab / Shift+Tab | Indent / unindent (works on a whole selection) |
+| Ctrl+Left / Ctrl+Right | Jump by word (with Shift: select by word) |
+| Ctrl+Backspace | Delete the word to the left |
+| Home / End, PageUp / PageDown, Ctrl+Home / Ctrl+End | Move around |
+
+On a Mac, Cmd works wherever Ctrl is listed.
+
+The Console tab has its own tools: **Copy** puts the whole console on your clipboard (handy for pasting
+an error to an AI), and **Clear** empties it without stopping the program. Error lines are shown in red.
+
+The flash is not a single block of text but a tiny filesystem of files, managed through the tab strip
+above the editor. That has its own page: [Files and Libraries](#files-and-libraries).
 
 ## Three kinds of memory
 
@@ -440,6 +503,7 @@ has. `sleep(0.01)` still waits one full tick.
 
 - The Console keeps the most recent 200 lines. Older lines scroll off.
 - The disk holds up to 1024 named values.
+- The flash holds up to 16 files and 120,000 characters of code in total.
 - The instruction budget per tick is set by config (below).
 
 ## Configuration
@@ -452,6 +516,113 @@ Server config file `computermod-common.toml` (NeoForge):
 | `minRpm` | 1.0 | Minimum RPM for a kinetically powered computer to run. |
 | `feCapacity` | 100000 | Size of the internal FE smoothing buffer, in FE. |
 | `fePerTick` | 20 | FE consumed per tick while running on electricity. Ignored while powered by rotation. |
+
+# Files and Libraries
+
+A computer's flash is not one wall of text. It is a tiny filesystem of named `.lua` files, just like a
+real microcontroller project. The file tabs above the code editor manage it.
+
+## main.lua is the program
+
+Every computer has a file called `main.lua`. It is the entry point: when the computer boots, `main.lua`
+runs from the top. It cannot be renamed or deleted. If you never add another file, the computer works
+exactly like a single-file machine, and that is perfectly fine for small programs.
+
+## Managing files in the editor
+
+- **Add:** press the **+** at the end of the tab strip, type a name, press Enter. Names use letters,
+  digits, `_` and `-`; the `.lua` ending is added for you.
+- **Rename:** right-click a tab.
+- **Delete:** click the small × on a tab, then click it again to confirm.
+- **Switch:** click a tab. A dot on a tab means that file has edits you have not flashed yet.
+
+A computer holds up to 16 files. Flashing always writes all of them to the block at once; the files are
+one program, stored together.
+
+## require: using a file as a library
+
+Files other than `main.lua` do nothing on their own. They are **libraries**, and a program pulls one in
+with `require`:
+
+- `require("pid")` runs the file `pid.lua` and returns whatever that file returns.
+- Each file runs **once per boot**. Calling `require("pid")` again later returns the same result
+  instantly instead of re-running the file. This means a library can safely be required from several
+  places.
+- The conventional shape of a library is: build a table of functions, return it at the end.
+
+```lua
+-- pid.lua: a reusable helper
+local M = {}
+function M.clamp(v, lo, hi)
+  if v < lo then return lo end
+  if v > hi then return hi end
+  return v
+end
+return M
+```
+
+```lua
+-- main.lua: the program that runs
+local pid = require("pid")
+while true do
+  local v = channel("throttle") or 0
+  emit("motor", pid.clamp(v, 0, 10))
+  sleep(0.1)
+end
+```
+
+Requiring a file that does not exist stops the program with `module 'x' not found`. A circle of
+requires (a needs b, b needs a) is also an error. `require("main")` is an error too, because
+`main.lua` is the entry point, not a library.
+
+## Errors name the file
+
+When a program crashes, the Console message includes the file and line, such as
+`pid.lua:4: attempt to compare nil with number`. You always know which tab to open.
+
+## What to put in a library
+
+- Helpers you reuse: maths, formatting, a PID controller, an alarm routine.
+- Your base's constants: a `config.lua` that returns channel names and thresholds, so the logic in
+  `main.lua` reads like English and the numbers live in one place.
+- Anything that makes `main.lua` short enough to read in one screen.
+
+```lua
+-- config.lua: one place for every name and number
+return {
+  tank_channel  = "boiler",
+  valve_channel = "valve",
+  low  = 20,   -- percent
+  high = 80,
+}
+```
+
+```lua
+-- main.lua
+local cfg = require("config")
+while true do
+  local t = channel(cfg.tank_channel)
+  local tk = t and t.tanks and t.tanks[1]
+  if tk and tk.capacity > 0 then
+    local p = tk.amount / tk.capacity * 100
+    if p < cfg.low  then emit(cfg.valve_channel, true)  end
+    if p > cfg.high then emit(cfg.valve_channel, false) end
+  end
+  sleep(0.5)
+end
+```
+
+> [!WHY]
+> One growing wall of code becomes hard to navigate fast. Files let you keep reusable helpers separate
+> from the program that uses them, and copy a library file between computers without dragging the whole
+> program along. This is also exactly how real Lua and real microcontroller projects are organised, so
+> an AI assistant understands the layout natively, and each computer stays a self-contained machine:
+> its files travel with the block, saved in the world.
+
+> [!NOTE]
+> Files belong to one computer. `require` only sees the files flashed onto that same block. To share
+> code between two computers, paste the library file into both (or keep it in a chat with your AI and
+> ask for it whenever you set up a new machine).
 
 # The Sensor
 
@@ -485,13 +656,26 @@ index into it, for example `channel("name").item_count`. A Sensor never publishe
 
 The Sensor's screen shows, live, exactly what it currently sees, as a collapsible tree that refreshes a
 couple of times a second. Fields that contain more data, such as `state`, `items`, and `nbt`, show an
-arrow. Click it to expand and read the nested values inside. Scroll with the mouse wheel.
+arrow; click the row to expand it. The panel remembers what you expanded even as the values underneath
+keep changing.
+
+The toolbar above the tree makes exploring fast:
+
+- **Search** filters the tree as you type, matching field names and values, and shows each match with
+  its parents so you can see where it lives. Searching `amount` on a tank instantly surfaces
+  `tanks > #1 > amount`.
+- **Expand all / collapse all** open or close the whole tree at once.
+- **Copy** puts the entire tree on your clipboard as indented text. Paste it to an AI together with
+  your request and it knows every field your block exposes, with live values.
+- **Click any value row** and the exact Lua expression that reads it is copied to your clipboard, for
+  example `channel("tank").tanks[1].amount`. Paste it straight into your program. No more counting
+  brackets by hand.
 
 > [!TRY]
 > Before writing any program, mount a Sensor on the block you want to read and open its screen. Browse
-> the tree to learn the exact field names that block offers. These names are what you use in code, and
-> what you tell an AI when [coding with AI](#coding-with-ai). Different blocks expose different fields,
-> so this is the fastest way to find out what is available.
+> or search the tree to learn the exact field names that block offers, then click the value you care
+> about and paste the copied expression into your code. Different blocks expose different fields, so
+> this is the fastest way to find out what is available.
 
 ## Reading fields
 
@@ -537,6 +721,11 @@ and it pops off if that block is removed. It reads nothing. It only outputs reds
 Right-click to set a channel. Every tick the Receiver reads the latest value on that channel, converts
 it to a redstone strength from 0 to 15, and emits that signal on all sides. Its built-in LED lights up
 and glows brighter as the signal rises, so you can see the output at a glance.
+
+The screen shows what is happening live: the latest value on the channel, the redstone strength it
+became, and a 0 to 15 meter. If a machine is not responding, one glance tells you whether the problem
+is upstream (no value arriving on the channel) or downstream (a value arrives but converts to 0, for
+example because it is a table).
 
 The conversion is simple:
 
@@ -829,6 +1018,7 @@ blocks.
 | `disk.list()` | table | Array of stored key names. |
 | `disk.clear()` | none | Wipe the whole disk. |
 | `sleep(seconds)` | none | Idle without using clock budget (minimum one tick, 0.05s). |
+| `require(name)` | the file's return value | Load another flashed file once and return its result. See [Files and Libraries](#files-and-libraries). |
 
 ## Output
 
@@ -884,15 +1074,25 @@ print("booted " .. (boots + 1) .. " times")   -- counts up across reboots
 Pauses the program without burning clock budget. Fractions are allowed but the minimum real wait is one
 game tick (**0.05s**); `sleep(0.02)` still waits one tick. Put a `sleep` in every forever-loop.
 
+## Modules
+
+### `require(name)` returns the file's return value
+Loads another file from this computer's flash. `require("pid")` runs the file `pid.lua` and returns
+whatever that file returns (a module that returns nothing yields `true`). Each file runs at most once
+per boot: later `require` calls for the same file return the cached result instantly. Requiring a file
+that does not exist, or a circular chain of requires, is an error. `main.lua` cannot be required, since
+it is the entry point. See [Files and Libraries](#files-and-libraries) for worked examples.
+
 ## The Lua sandbox
 
 You get Lua 5.1 with the standard libraries that make sense in a game.
 
 Available: base functions (`print`, `type`, `tostring`, `tonumber`, `pairs`, `ipairs`, `next`,
 `select`, `error`, `assert`, `pcall`, `xpcall`, `setmetatable`, `getmetatable`, `rawget`, `rawset`,
-`unpack`, `#`, and so on), `math.*`, `string.*`, `table.*`, and `os.time`, `os.clock`, `os.date`.
+`unpack`, `#`, and so on), `math.*`, `string.*`, `table.*`, `os.time`, `os.clock`, `os.date`, and
+`require` for the computer's own files.
 
-Disabled for safety (these are `nil`): `io`, file access, `os.execute`, `os.exit`, `require`,
+Disabled for safety (these are `nil`): `io`, file access outside the flash, `os.execute`, `os.exit`,
 `package`, `load`, `loadstring`, `dofile`, `loadfile`, `debug`, `collectgarbage`, and any Java access
 (`luajava`).
 
@@ -920,6 +1120,34 @@ and Controllers all share the same set of channels by name. Pick any name you li
 > value. Give channels clear, specific names (`north-gate`, `boiler-pump`, `farm-3-alarm`) so different
 > projects do not collide by accident.
 
+## The channel browser
+
+Every channel box in the mod (on the Sensor, the Receiver, and the Controller's bindings) is more than
+a text field. While it is focused, a dropdown lists every channel the server currently knows about, and
+you can pick one with the mouse or with the arrow keys and Enter. Each row shows three things:
+
+- **The name.** Typing filters the list.
+- **A preview of the latest value**, such as `7`, `true`, or `{12 fields}`.
+- **Who uses it**, as coloured tags: **S** sensors (green), **C** computers (blue), **R** receivers
+  (orange), **P** player controllers (pink). `S1 C2 R1` means one sensor publishes it, two computers
+  touch it, and one receiver listens.
+
+A channel counts as in use if anything used it recently: a sensor or receiver configured to it, a
+computer that called `emit` or `channel` on it, or a controller binding that drove it. That includes
+channels that only ever flow between two computers, with no block attached at all. An endpoint that
+goes away (a broken sensor, a powered-off computer) drops out of the tags, and an unused channel
+disappears from the list about a minute after its last activity.
+
+The small dot inside the box is a quick existence check: green means the typed name matches an existing
+channel, blue means it would create a new one. A green dot is what you want when connecting to
+something; if you expected green and see blue, look for a typo.
+
+> [!TIP]
+> The tags catch the classic wiring mistakes at a glance. A channel a receiver listens on that shows
+> no S or C tag has no one driving it. A channel showing two S tags has two sensors fighting over one
+> name. And if you cannot remember what a base full of machines calls its channels, just open any
+> channel box and read the list.
+
 ## Rich values beyond 0 to 15
 
 Vanilla and Create redstone carry a single number from 0 to 15. A channel can carry a number, string,
@@ -944,6 +1172,103 @@ current state.
 Channels are runtime state. They are not saved and are cleared when the server stops. Sensors and
 looping computers re-publish constantly, so values reappear as soon as things are running again. For
 data that must persist, use the computer's [disk](#api-reference).
+
+# Chunks and Staying Loaded
+
+Minecraft only simulates the parts of the world near players, called loaded chunks (a chunk is a 16 by
+16 block column). Everything outside that is unloaded: frozen on disk, using no resources. Furnaces
+stop smelting, crops stop growing, and this mod's blocks pause too. This page explains exactly what
+pausing means here, and how to keep a far-away system running.
+
+## What happens in an unloaded chunk
+
+| Block | While its chunk is unloaded | When the chunk loads again |
+|---|---|---|
+| Computer | Powers off, exactly like a power cut: the program halts, RAM is wiped. Flash and disk are safe. | Boots `main.lua` fresh on the next tick, if powered. |
+| Sensor | Stops scanning and publishing. Its **last published value stays on the channel**, frozen. | Re-scans and re-publishes immediately. |
+| Receiver | Stops updating; its redstone output is frozen (which only matters to its neighbours, who are unloaded too). | Re-reads its channel and corrects itself within a tick. |
+
+Channels themselves do not live in chunks at all. They are server-wide: unlimited range, across
+dimensions, unaffected by loading. The one rule is that channel values are not saved to disk, so a
+server restart clears them; everything repopulates by itself as publishers come back.
+
+> [!NOTE]
+> The frozen last value cuts both ways. For a fixed beacon (a base broadcasting its coordinates) it is
+> exactly what you want: the position is still correct. For live readings (a tank level) it is stale
+> data, and a reader cannot tell. If a system must keep producing fresh data with no player around, it
+> needs its chunks kept loaded, which is what the toggle below is for.
+
+## The Keep loaded toggle
+
+The Computer, Sensor, and Receiver screens each have a **Keep loaded** button in the top right. Switch
+it on and the block holds its surrounding chunks loaded and running, players nearby or not:
+
+- A keep-loaded computer keeps executing its program.
+- A keep-loaded sensor keeps publishing fresh readings.
+- A keep-loaded receiver keeps converting its channel into redstone for the machines around it.
+
+The setting is per block, saved with the world, and survives server restarts. Breaking the block
+releases its chunks. By default each block keeps a 3 by 3 area of chunks loaded around itself, so a
+computer's power source (its cogwheel network) keeps spinning with it; a server config can shrink that
+to a single chunk or disable the feature entirely.
+
+> [!WHY]
+> Chunk loading is opt-in per block rather than automatic because loaded chunks cost server
+> performance: everything in them keeps ticking. Most computers stand next to the machines they manage
+> and simply pause with them, which costs nothing and changes nothing. The toggle is for the deliberate
+> few that must run unattended.
+
+## Example: a far-away airport beacon
+
+An airport on the far side of the map should keep reporting vectors to approaching aircraft, even when
+nobody is near it.
+
+1. At the airport, place a computer, give it power, and switch **Keep loaded** on.
+2. Flash it with a beacon program:
+
+```lua
+-- the airport announces itself forever
+while true do
+  emit("airport", {
+    pos = getLocation(),
+    name = "north-field",
+  })
+  sleep(1)
+end
+```
+
+3. Any aircraft's computer, anywhere in the world, can now compute its approach vector live:
+
+```lua
+local me = getLocation()
+local port = channel("airport")
+if port then
+  local dx = port.pos.x - me.x
+  local dz = port.pos.z - me.z
+  print(string.format("distance %.0f, heading %.0f", math.sqrt(dx*dx + dz*dz),
+    math.deg(math.atan2(dx, -dz))))
+end
+```
+
+If the airport also has sensors (a runway occupancy sensor, a fuel tank) and receivers (runway lights),
+switch Keep loaded on for those too, or place them within the computer's loaded area. The whole site
+then runs as if a player were standing on it.
+
+> [!TIP]
+> One keep-loaded block already covers a 3 by 3 chunk area (48 by 48 blocks) by default. A compact
+> airport needs only its computer toggled on, with the sensors, receivers, and power inside that area.
+
+## Performance and server settings
+
+Two entries in the server config (`computermod-common.toml`) govern this feature:
+
+| Key | Default | Meaning |
+|---|---|---|
+| `allowChunkLoading` | true | Master switch. Off drops every Keep loaded ticket on the next world load. |
+| `chunkLoadRadius` | 1 | Chunk radius kept loaded around a toggled block. 0 = its own chunk only, 1 = 3x3, 2 = 5x5. |
+
+Each keep-loaded block is roughly as costly as a player standing in that spot, so use the toggle where
+it earns its keep, not on every machine.
 
 # Reading Any Mod or Addon
 
@@ -1219,6 +1544,16 @@ exposes. For mod-specific values, expand the `nbt` subtree. See
 That is RAM, which is wiped on power loss by design. Use `disk.*` for anything that must persist. Your
 code persists in flash.
 
+## ERROR: module 'x' not found
+`require("x")` looked for a file called `x.lua` on this computer and there is none. Check the file tabs:
+the name must match exactly, and the file must be flashed onto this computer (every computer has its own
+files). Remember that `require` takes the name without the extension: `require("pid")` loads `pid.lua`.
+
+## My edits disappeared when I closed the screen
+Edits only become permanent when you press Flash (or Ctrl+S). The amber "unflashed changes" note in the
+status bar warns you while edits exist only on your screen. Make flashing a habit, exactly like saving
+a document.
+
 ## Will a `while true` loop lag the game?
 No. Your program runs on its own throttled clock on a background thread, so it cannot freeze Minecraft
 even with no `sleep`. A `sleep` is still strongly recommended, because it stops the loop wasting
@@ -1251,8 +1586,10 @@ it is probably here.
 | Receiver | A plate that turns a channel value into a redstone signal. The hands. |
 | Controller | A handheld item that lets you write to channels with your keyboard and mouse. |
 | Channel | A named wireless slot that holds one value. Parts share data by reading and writing channels. |
-| Flash | To save your program permanently into a computer by pressing the Flash button. |
-| Boot | What a computer does when it gains power: start your program fresh from the top. |
+| Flash | To save your program permanently into a computer by pressing the Flash button. Also the storage itself, which holds your files. |
+| `main.lua` | The file that runs when a computer boots. Every computer has one. |
+| `require` | The function that loads another of the computer's files as a library. |
+| Boot | What a computer does when it gains power: start `main.lua` fresh from the top. |
 | Disk | Permanent storage inside a computer for values you want to keep across reboots. |
 | RAM | A computer's temporary memory while running. Wiped on power loss. |
 | Tick | One step of the game clock, one twentieth of a second. The game runs at 20 ticks per second. |
@@ -1290,9 +1627,10 @@ disk.delete(key)                  remove a key
 disk.list()                       -> array of stored keys
 disk.clear()                      wipe the disk
 sleep(seconds)                    idle (minimum 0.05s)
+require(name)                     load file "name.lua" once, return its result
 
 Lua 5.1: math.* string.* table.* os.time/clock/date, pcall, pairs, ipairs ...
-Disabled: io, require, package, load/loadstring, debug, os.execute, collectgarbage
+Disabled: io, package, load/loadstring, debug, os.execute, collectgarbage
 ```
 
 ```
@@ -1304,6 +1642,14 @@ BLOCKS & ITEMS
   Sensor      thin plate on a block face; publishes that block's full reading table
   Receiver    thin plate; turns a channel value into redstone (num->0-15, true->15)
   Controller  handheld; binds keys/mouse/scroll to channels (left-click config, right-click operate)
+
+FILES
+  main.lua runs at boot; other files are libraries loaded with require("name")
+  up to 16 files per computer; errors name the file: "pid.lua:4: ..."
+
+EDITOR
+  Ctrl+S flash   Ctrl+F find   Ctrl+Z/Y undo/redo   Ctrl+/ comment   Ctrl+D duplicate
+  Tab/Shift+Tab indent selection   sensor GUI: click a value to copy its Lua path
 
 SENSOR FIELDS (depend on block)
   block  is_air  has_block_entity

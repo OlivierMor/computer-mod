@@ -1,25 +1,46 @@
+# Computer Mod
 
-Installation information
-=======
+A programmable Lua computer for [Create](https://github.com/Creators-of-Create/Create)
+(NeoForge 1.21.1). It adds the autonomous half that Create is missing: machines that watch the world,
+think, and act on their own.
 
-This template repository can be directly cloned to get you started with a new
-mod. Simply create a new repository cloned from this one, by following the
-instructions provided by [GitHub](https://docs.github.com/en/repositories/creating-and-managing-repositories/creating-a-repository-from-a-template).
+```
+world -> [Sensor] -> channel -> [Computer] -> channel -> [Receiver] -> world
+```
 
-Once you have your clone, simply open the repository in the IDE of your choice. The usual recommendation for an IDE is either IntelliJ IDEA or Eclipse.
+## The parts
 
-If at any point you are missing libraries in your IDE, or you've run into problems you can
-run `gradlew --refresh-dependencies` to refresh the local cache. `gradlew clean` to reset everything 
-{this does not affect your code} and then start the process again.
+- **Computer**: a microcontroller block. Flash Lua files onto it (`main.lua` plus libraries loaded
+  with `require`), power it with rotation or Forge Energy, and it boots and runs. Its screen is a
+  small IDE with file tabs, find, undo, a console, and a live status bar.
+- **Sensor**: a thin plate that reads whatever block it is mounted on, generically (inventories,
+  tanks, energy, blockstate, and the block's full NBT), and publishes the readings on a wireless
+  channel the instant they change. Its screen shows everything it sees as a live, searchable tree;
+  click any value to copy the Lua expression that reads it.
+- **Receiver**: a thin plate that turns the latest channel value into a redstone signal of 0 to 15.
+  Its screen shows the live value and the resulting signal on a meter.
+- **Controller**: a handheld item that binds your keys, mouse, and scroll wheel to channels, for
+  driving contraptions by hand or overriding programs.
 
-Mapping Names:
-============
-By default, the MDK is configured to use the official mapping names from Mojang for methods and fields 
-in the Minecraft codebase. These names are covered by a specific license. All modders should be aware of this
-license. For the latest license text, refer to the mapping file itself, or the reference copy here:
-https://github.com/NeoForged/NeoForm/blob/main/Mojang.md
+Because the Sensor reads blocks through standard capabilities, blockstate, and NBT, it works with
+any correctly built mod or Create addon, with no integration code.
 
-Additional Resources: 
-==========
-Community Documentation: https://docs.neoforged.net/  
-NeoForged Discord: https://discord.neoforged.net/
+## Documentation
+
+The full documentation site lives in [`docs/`](docs/) (a single self-contained `index.html`, also
+published via GitHub Pages). It covers the concepts, every block, every function, Lua from zero, and
+an AI-assisted workflow for people who do not code.
+
+For LLM users: [`COMPUTER_PROGRAMMING_GUIDE.md`](COMPUTER_PROGRAMMING_GUIDE.md) is a single context
+file that teaches an AI assistant the entire API so it can write programs for you.
+
+## Building
+
+This is a standard NeoForge Gradle project:
+
+```bash
+./gradlew build        # build the mod jar into build/libs
+./gradlew runClient    # launch a development client
+```
+
+Requires Java 21. Create and its dependencies are pulled in through the Gradle setup.

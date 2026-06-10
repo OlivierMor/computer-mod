@@ -17,5 +17,7 @@
   "computermod.configuration.section.computermod.common.toml": "Computer Mod Configs",
   "computermod.configuration.section.computermod.common.toml.title": "Computer Mod Configs",
   "computermod.configuration.maxOpsPerTick": "Max Instructions Per Tick",
-  "computermod.configuration.minRpm": "Minimum RPM To Run"
+  "computermod.configuration.minRpm": "Minimum RPM To Run",
+  "computermod.configuration.feCapacity": "FE Buffer Capacity",
+  "computermod.configuration.fePerTick": "FE Consumed Per Tick"
 }

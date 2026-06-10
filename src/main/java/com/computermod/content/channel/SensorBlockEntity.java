@@ -5,7 +5,9 @@ import java.util.List;
 import java.util.Map;
 
 import com.computermod.channel.ChannelBus;
+import com.computermod.channel.ChannelDirectory;
 import com.computermod.reading.ReadingStack;
+import com.computermod.world.ChunkLoadManager;
 import com.simibubi.create.foundation.blockEntity.SmartBlockEntity;
 import com.simibubi.create.foundation.blockEntity.behaviour.BlockEntityBehaviour;
 
@@ -31,7 +33,8 @@ import org.jetbrains.annotations.Nullable;
  * transmits immediately (no fixed interval), so e.g. an item being added goes out that same tick. The
  * GUI shows, live, exactly what the sensor currently sees.
  */
-public class SensorBlockEntity extends SmartBlockEntity implements MenuProvider, ChannelConfigurable {
+public class SensorBlockEntity extends SmartBlockEntity
+	implements MenuProvider, ChannelConfigurable, ChunkLoadManager.KeepLoaded {
 
 	/** How often (in ticks) we refresh + sync the readings tree shown in the GUI (a client packet). */
 	private static final int DISPLAY_INTERVAL = 10;
@@ -43,6 +46,8 @@ public class SensorBlockEntity extends SmartBlockEntity implements MenuProvider,
 	public record Node(int depth, String key, String value, boolean container) {}
 
 	private String channel = "";
+	/** Whether this sensor force-loads its chunks so it keeps publishing with no player nearby. */
+	private boolean keepLoaded = false;
 	private int displayTimer = 0;
 	/** Last table published to the channel; used to publish only when something actually changed. */
 	private Map<String, Object> lastPublished = null;
@@ -68,9 +73,12 @@ public class SensorBlockEntity extends SmartBlockEntity implements MenuProvider,
 		Map<String, Object> data = ReadingStack.scan(level, target);
 
 		// Transmit the instant the readings change — no fixed interval, so changes go out the same tick.
-		if (!channel.isEmpty() && !data.equals(lastPublished)) {
-			ChannelBus.get().publish(channel, data);
-			lastPublished = data;
+		if (!channel.isEmpty()) {
+			ChannelDirectory.get().touch(channel, ChannelDirectory.Kind.SENSOR, worldPosition, level.getGameTime());
+			if (!data.equals(lastPublished)) {
+				ChannelBus.get().publish(channel, data);
+				lastPublished = data;
+			}
 		}
 
 		// Refresh the GUI tree at a gentler rate (it's a client packet; eyes don't need every tick).
@@ -132,9 +140,37 @@ public class SensorBlockEntity extends SmartBlockEntity implements MenuProvider,
 	public void configure(String newChannel) {
 		String previous = channel;
 		this.channel = newChannel == null ? "" : newChannel;
-		if (!previous.isEmpty() && !previous.equals(channel))
+		if (!previous.isEmpty() && !previous.equals(channel)) {
 			ChannelBus.get().publish(previous, null); // release the old channel
+			ChannelDirectory.get().forget(worldPosition);
+		}
 		lastPublished = null; // force an immediate re-publish to the (new) channel next tick
+		setChanged();
+		sendData();
+	}
+
+	@Override
+	public void destroy() {
+		// Broken: stop occupying the channel — clear the value and drop out of the directory.
+		if (!channel.isEmpty())
+			ChannelBus.get().publish(channel, null);
+		ChannelDirectory.get().forget(worldPosition);
+		if (keepLoaded && level instanceof net.minecraft.server.level.ServerLevel serverLevel)
+			ChunkLoadManager.setForced(serverLevel, worldPosition, false);
+		super.destroy();
+	}
+
+	@Override
+	public boolean isKeepLoaded() {
+		return keepLoaded;
+	}
+
+	public void setKeepLoaded(boolean keep) {
+		if (keepLoaded == keep)
+			return;
+		keepLoaded = keep;
+		if (level instanceof net.minecraft.server.level.ServerLevel serverLevel)
+			ChunkLoadManager.setForced(serverLevel, worldPosition, keep);
 		setChanged();
 		sendData();
 	}
@@ -154,6 +190,7 @@ public class SensorBlockEntity extends SmartBlockEntity implements MenuProvider,
 	protected void write(CompoundTag compound, HolderLookup.Provider registries, boolean clientPacket) {
 		super.write(compound, registries, clientPacket);
 		compound.putString("Channel", channel);
+		compound.putBoolean("KeepLoaded", keepLoaded);
 		if (clientPacket) {
 			ListTag lines = new ListTag();
 			for (Node node : readings) {
@@ -172,6 +209,7 @@ public class SensorBlockEntity extends SmartBlockEntity implements MenuProvider,
 	protected void read(CompoundTag compound, HolderLookup.Provider registries, boolean clientPacket) {
 		super.read(compound, registries, clientPacket);
 		channel = compound.getString("Channel");
+		keepLoaded = compound.getBoolean("KeepLoaded");
 		if (clientPacket) {
 			readings.clear();
 			ListTag lines = compound.getList("Readings", Tag.TAG_COMPOUND);

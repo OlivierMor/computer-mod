@@ -26,6 +26,16 @@ public class Config {
 		.comment("Forge Energy consumed per tick while running on electrical power (when not kinetically powered).")
 		.defineInRange("fePerTick", 20, 0, Integer.MAX_VALUE);
 
+	public static final ModConfigSpec.BooleanValue ALLOW_CHUNK_LOADING = BUILDER
+		.comment("Allow the 'Keep loaded' toggle on computers, sensors and receivers to force-load their chunks.",
+			"Disabling drops all of this mod's chunk tickets on the next world load.")
+		.define("allowChunkLoading", true);
+
+	public static final ModConfigSpec.IntValue CHUNK_LOAD_RADIUS = BUILDER
+		.comment("Chunk radius kept loaded around a block with 'Keep loaded' enabled.",
+			"0 = only its own chunk; 1 = 3x3 chunks (safer when its power network crosses a chunk border).")
+		.defineInRange("chunkLoadRadius", 1, 0, 2);
+
 	public static final ModConfigSpec SPEC = BUILDER.build();
 
 	private Config() {}

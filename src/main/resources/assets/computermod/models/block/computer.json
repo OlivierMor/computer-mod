@@ -1,10 +1,71 @@
 {
-  "parent": "create:block/encased_cogwheel/block",
-  "render_type": "minecraft:cutout",
+  "credit": "Casing structure copied from create:block/encased_shaft/block (brass variant): a brass shell with recessed shaft openings on the axis faces; the rotating shaft inside is drawn by ComputerRenderer. Model-space axis is Y, rotated horizontal by the blockstate.",
+  "parent": "block/block",
   "textures": {
-    "1": "computermod:block/computer_socket",
-    "casing": "computermod:block/computer_casing",
-    "particle": "computermod:block/computer_casing",
-    "side": "computermod:block/computer_encased_side"
-  }
+    "particle": "computermod:block/computer_side",
+    "casing": "create:block/brass_casing",
+    "opening": "create:block/brass_gearbox",
+    "side": "computermod:block/computer_side",
+    "top": "computermod:block/computer_top",
+    "bottom": "create:block/brass_casing"
+  },
+  "elements": [
+    {
+      "name": "WallNorth",
+      "from": [0, 0, 0],
+      "to": [16, 16, 2],
+      "faces": {
+        "north": {"uv": [0, 0, 16, 16], "texture": "#top", "cullface": "north"},
+        "east": {"uv": [14, 0, 16, 16], "texture": "#side", "cullface": "east"},
+        "south": {"uv": [0, 0, 16, 16], "texture": "#casing"},
+        "west": {"uv": [0, 0, 2, 16], "texture": "#side", "cullface": "west"},
+        "up": {"uv": [0, 14, 16, 16], "rotation": 180, "texture": "#casing", "cullface": "up"},
+        "down": {"uv": [0, 14, 16, 16], "texture": "#casing", "cullface": "down"}
+      }
+    },
+    {
+      "name": "Core",
+      "from": [1, 0.95, 2],
+      "to": [15, 15.05, 14],
+      "faces": {
+        "up": {"uv": [1, 2, 15, 14], "rotation": 180, "texture": "#opening"},
+        "down": {"uv": [1, 2, 15, 14], "texture": "#opening"}
+      }
+    },
+    {
+      "name": "WallSouth",
+      "from": [0, 0, 14],
+      "to": [16, 16, 16],
+      "faces": {
+        "north": {"uv": [0, 0, 16, 16], "texture": "#casing"},
+        "east": {"uv": [0, 0, 2, 16], "texture": "#side", "cullface": "east"},
+        "south": {"uv": [0, 0, 16, 16], "texture": "#bottom", "cullface": "south"},
+        "west": {"uv": [14, 0, 16, 16], "texture": "#side", "cullface": "west"},
+        "up": {"uv": [0, 0, 16, 2], "rotation": 180, "texture": "#casing", "cullface": "up"},
+        "down": {"uv": [0, 0, 16, 2], "texture": "#casing", "cullface": "down"}
+      }
+    },
+    {
+      "name": "SideWest",
+      "from": [0, 0, 2],
+      "to": [2, 16, 14],
+      "faces": {
+        "east": {"uv": [2, 0, 14, 16], "texture": "#casing"},
+        "west": {"uv": [2, 0, 14, 16], "texture": "#side", "cullface": "west"},
+        "up": {"uv": [14, 2, 16, 14], "rotation": 180, "texture": "#casing", "cullface": "up"},
+        "down": {"uv": [0, 2, 2, 14], "texture": "#casing", "cullface": "down"}
+      }
+    },
+    {
+      "name": "SideEast",
+      "from": [14, 0, 2],
+      "to": [16, 16, 14],
+      "faces": {
+        "east": {"uv": [2, 0, 14, 16], "texture": "#side", "cullface": "east"},
+        "west": {"uv": [2, 0, 14, 16], "texture": "#casing"},
+        "up": {"uv": [0, 2, 2, 14], "rotation": 180, "texture": "#casing", "cullface": "up"},
+        "down": {"uv": [14, 2, 16, 14], "texture": "#casing", "cullface": "down"}
+      }
+    }
+  ]
 }

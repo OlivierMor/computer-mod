@@ -92,6 +92,13 @@ public abstract class WallChannelBlock<T extends BlockEntity> extends Block impl
 	}
 
 	@Override
+	protected void onRemove(BlockState state, Level level, BlockPos pos, BlockState newState, boolean isMoving) {
+		// Route removal through Create's helper so SmartBlockEntity.destroy() actually runs
+		// (releasing the block's channel and any chunk tickets it owns).
+		IBE.onRemove(state, level, pos, newState);
+	}
+
+	@Override
 	protected InteractionResult useWithoutItem(BlockState state, Level level, BlockPos pos, Player player,
 		BlockHitResult hit) {
 		if (!level.isClientSide && player instanceof ServerPlayer serverPlayer

@@ -35,9 +35,13 @@ public class ComputerMod {
 
 		modEventBus.addListener(ModNetwork::register);
 		modEventBus.addListener(ComputerBlockEntity::registerCapabilities);
+		modEventBus.addListener(com.computermod.world.ChunkLoadManager::register);
 
 		net.neoforged.neoforge.common.NeoForge.EVENT_BUS.addListener(
-			(net.neoforged.neoforge.event.server.ServerStoppingEvent e) -> com.computermod.channel.ChannelBus.get().clear());
+			(net.neoforged.neoforge.event.server.ServerStoppingEvent e) -> {
+				com.computermod.channel.ChannelBus.get().clear();
+				com.computermod.channel.ChannelDirectory.get().clear();
+			});
 
 		modContainer.registerConfig(ModConfig.Type.COMMON, Config.SPEC);
 

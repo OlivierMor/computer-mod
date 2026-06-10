@@ -22,12 +22,6 @@ public class ModBlocks {
 			.requiresCorrectToolForDrops()
 			.strength(3.0f, 6.0f)
 			.sound(SoundType.NETHERITE_BLOCK)
-			// The block has a see-through window band (transparent pixels in the encased side
-			// texture). Without this, the block occludes its neighbours: an adjacent block's
-			// touching face gets culled, and you then see straight through our transparent band
-			// to where that culled face should be — i.e. the void. Disabling occlusion keeps the
-			// neighbour faces drawn so the window looks through to them instead of nothing.
-			.noOcclusion()
 	);
 
 	public static final DeferredBlock<SensorBlock> SENSOR = BLOCKS.registerBlock(

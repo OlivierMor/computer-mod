@@ -1,5 +1,7 @@
 package com.computermod.network;
 
+import java.util.LinkedHashMap;
+
 import com.computermod.ComputerMod;
 import com.computermod.content.computer.ComputerBlockEntity;
 
@@ -12,15 +14,19 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.player.Player;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
 
-/** Client -> server: flash {@code source} onto the computer at {@code pos} (persistent program memory). */
-public record FlashProgramC2S(BlockPos pos, String source) implements CustomPacketPayload {
+/**
+ * Client -> server: flash the whole filesystem ({@code name -> source}, in tab order) onto the
+ * computer at {@code pos}. The server re-validates names and sizes before accepting.
+ */
+public record FlashProgramC2S(BlockPos pos, LinkedHashMap<String, String> files) implements CustomPacketPayload {
 
 	public static final Type<FlashProgramC2S> TYPE =
 		new Type<>(ResourceLocation.fromNamespaceAndPath(ComputerMod.MODID, "flash_program"));
 
 	public static final StreamCodec<RegistryFriendlyByteBuf, FlashProgramC2S> CODEC = StreamCodec.composite(
 		BlockPos.STREAM_CODEC, FlashProgramC2S::pos,
-		ByteBufCodecs.STRING_UTF8, FlashProgramC2S::source,
+		ByteBufCodecs.map(LinkedHashMap::new, ByteBufCodecs.STRING_UTF8, ByteBufCodecs.STRING_UTF8),
+		FlashProgramC2S::files,
 		FlashProgramC2S::new);
 
 	@Override
@@ -34,7 +40,7 @@ public record FlashProgramC2S(BlockPos pos, String source) implements CustomPack
 			if (player.distanceToSqr(msg.pos().getCenter()) > 64.0)
 				return;
 			if (player.level().getBlockEntity(msg.pos()) instanceof ComputerBlockEntity computer)
-				computer.flashProgram(msg.source());
+				computer.flashProgram(msg.files());
 		});
 	}
 }

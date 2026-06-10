@@ -1,12 +1,17 @@
 package com.computermod.content.computer;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.regex.Pattern;
 
 import com.computermod.Config;
+import com.computermod.channel.ChannelDirectory;
 import com.computermod.registry.ModBlockEntities;
 import com.computermod.runtime.ComputerApi;
 import com.computermod.runtime.LuaRuntime;
+import com.computermod.world.ChunkLoadManager;
 import com.simibubi.create.content.kinetics.base.KineticBlockEntity;
 import com.simibubi.create.foundation.blockEntity.behaviour.BlockEntityBehaviour;
 
@@ -34,18 +39,30 @@ import org.jetbrains.annotations.Nullable;
  * (persistent), and it runs whenever powered. Powering it boots a fresh runtime from the flashed
  * code; losing power halts it and discards all volatile state (RAM + live terminal). It can be
  * powered by Create rotation (Stress) and/or Forge Energy.
+ *
+ * <p>The flash holds a small <b>filesystem</b>: named {@code .lua} files in a fixed order. Booting
+ * runs {@code main.lua}; the other files are libraries loaded with {@code require("name")}.
  */
-public class ComputerBlockEntity extends KineticBlockEntity implements MenuProvider {
+public class ComputerBlockEntity extends KineticBlockEntity implements MenuProvider, ChunkLoadManager.KeepLoaded {
 
 	/** Stress units this computer imposes on the network (relative to RPM, like other machines). */
 	public static final float STRESS_IMPACT = 4.0f;
 
 	public static final String OFF = "OFF";
 
+	/** The boot file every computer runs first. Always present, never deletable. */
+	public static final String MAIN_FILE = "main.lua";
+	public static final int MAX_FILES = 16;
+	public static final int MAX_TOTAL_CHARS = 120_000;
+	/** Legal file names: letters/digits/_/- plus the .lua suffix, e.g. {@code pid.lua}. */
+	public static final Pattern FILE_NAME = Pattern.compile("[A-Za-z0-9_\\-]{1,24}\\.lua");
+
 	private static final int SYNC_INTERVAL = 10;
 
-	/** Persisted "flash memory": the program source. */
-	private String programSource = "";
+	/** Persisted "flash memory": the program files, in tab order. {@code main.lua} is always first. */
+	private LinkedHashMap<String, String> files = newFlash();
+	/** Whether this computer force-loads its chunks so it keeps running with no player nearby. */
+	private boolean keepLoaded = false;
 	/** Internal Forge Energy buffer (persisted). */
 	private ComputerEnergyStorage energy;
 
@@ -64,12 +81,19 @@ public class ComputerBlockEntity extends KineticBlockEntity implements MenuProvi
 
 	/** Client-only mirror, populated from sync packets. */
 	private String clientState = OFF;
+	private String clientError = "";
 	private final List<String> clientTerminal = new ArrayList<>();
 
 	public ComputerBlockEntity(BlockEntityType<?> type, BlockPos pos, BlockState state) {
 		super(type, pos, state);
 		energy = new ComputerEnergyStorage(Config.FE_CAPACITY.get(), Config.FE_CAPACITY.get(),
 			() -> level != null ? level.getGameTime() : 0L);
+	}
+
+	private static LinkedHashMap<String, String> newFlash() {
+		LinkedHashMap<String, String> map = new LinkedHashMap<>();
+		map.put(MAIN_FILE, "");
+		return map;
 	}
 
 	public static void registerCapabilities(RegisterCapabilitiesEvent event) {
@@ -125,7 +149,7 @@ public class ComputerBlockEntity extends KineticBlockEntity implements MenuProvi
 				LuaRuntime fresh = new LuaRuntime(Config.MAX_OPS_PER_TICK.get());
 				fresh.setApiInstaller(g -> ComputerApi.install(g, fresh, this));
 				runtime = fresh;
-				runtime.start(programSource);
+				runtime.start(new LinkedHashMap<>(files));
 				forceSync();
 			}
 			// Drain the worker's world-access requests and grant it the next clock slice.
@@ -137,10 +161,18 @@ public class ComputerBlockEntity extends KineticBlockEntity implements MenuProvi
 		} else if (runtime != null) {
 			// Power lost: shut off, discard RAM, freeze the last terminal for display.
 			frozenTerminal = runtime.getTerminalSnapshot();
-			runtime.stop();
-			runtime = null;
+			haltRuntime();
 			forceSync();
 		}
+	}
+
+	/** Stop the worker and drop this computer's channel-directory entries. */
+	private void haltRuntime() {
+		if (runtime != null) {
+			runtime.stop();
+			runtime = null;
+		}
+		ChannelDirectory.get().forget(worldPosition);
 	}
 
 	// --- Persistent disk store (server thread) ---
@@ -211,41 +243,93 @@ public class ComputerBlockEntity extends KineticBlockEntity implements MenuProvi
 
 	// --- Flashing (server side) ---
 
-	/** Replace the flashed program. Reboots cleanly if currently powered. */
-	public void flashProgram(String source) {
-		setProgramSource(source);
-		if (runtime != null) {
-			runtime.stop();    // kill the running worker so the next powered tick boots fresh
-			runtime = null;
-		}
+	/** Replace the flashed files. Reboots cleanly if currently powered. */
+	public void flashProgram(Map<String, String> newFiles) {
+		this.files = sanitize(newFiles);
+		haltRuntime(); // kill the running worker so the next powered tick boots fresh
 		frozenTerminal = null;
 		setChanged();
+		forceSync();
+	}
+
+	/**
+	 * Enforce the flash limits no matter what a client sends: legal names only, {@code main.lua}
+	 * always present and first, at most {@link #MAX_FILES} files / {@link #MAX_TOTAL_CHARS} chars.
+	 */
+	public static LinkedHashMap<String, String> sanitize(Map<String, String> input) {
+		LinkedHashMap<String, String> out = newFlash();
+		if (input == null)
+			return out;
+		int total = 0;
+		for (Map.Entry<String, String> e : input.entrySet()) {
+			String name = e.getKey() == null ? "" : e.getKey().trim();
+			String source = e.getValue() == null ? "" : e.getValue();
+			if (!FILE_NAME.matcher(name).matches())
+				continue;
+			if (!name.equals(MAIN_FILE) && out.size() >= MAX_FILES)
+				continue;
+			if (total + source.length() > MAX_TOTAL_CHARS)
+				source = source.substring(0, Math.max(0, MAX_TOTAL_CHARS - total));
+			total += source.length();
+			out.put(name, source);
+		}
+		return out;
+	}
+
+	/** Empty the terminal of the running program (and any frozen snapshot). */
+	public void clearTerminal() {
+		frozenTerminal = null;
+		if (runtime != null)
+			runtime.clearTerminal();
 		forceSync();
 	}
 
 	@Override
 	public void invalidate() {
 		// Block broken or chunk unloaded: never leave the worker thread running.
-		if (runtime != null) {
-			runtime.stop();
-			runtime = null;
-		}
+		haltRuntime();
 		super.invalidate();
 	}
 
-	public String getProgramSource() {
-		return programSource;
+	@Override
+	public void destroy() {
+		// Block actually broken (not just unloaded): release any chunk tickets it owns.
+		if (keepLoaded && level instanceof net.minecraft.server.level.ServerLevel serverLevel)
+			ChunkLoadManager.setForced(serverLevel, worldPosition, false);
+		super.destroy();
 	}
 
-	public void setProgramSource(String source) {
-		this.programSource = source == null ? "" : source;
+	// --- Chunk loading ---
+
+	@Override
+	public boolean isKeepLoaded() {
+		return keepLoaded;
+	}
+
+	public void setKeepLoaded(boolean keep) {
+		if (keepLoaded == keep)
+			return;
+		keepLoaded = keep;
+		if (level instanceof net.minecraft.server.level.ServerLevel serverLevel)
+			ChunkLoadManager.setForced(serverLevel, worldPosition, keep);
 		setChanged();
+		sendData();
+	}
+
+	/** The flashed files in tab order ({@code main.lua} first). Do not mutate. */
+	public Map<String, String> getFiles() {
+		return files;
 	}
 
 	// --- Client-facing accessors (used by the screen) ---
 
 	public String getClientState() {
 		return clientState;
+	}
+
+	/** Last error message, or "" (client mirror). */
+	public String getClientError() {
+		return clientError;
 	}
 
 	public List<String> getClientTerminal() {
@@ -278,12 +362,21 @@ public class ComputerBlockEntity extends KineticBlockEntity implements MenuProvi
 	@Override
 	protected void write(CompoundTag compound, HolderLookup.Provider registries, boolean clientPacket) {
 		super.write(compound, registries, clientPacket);
-		compound.putString("ProgramSource", programSource);
+		ListTag fileList = new ListTag();
+		for (Map.Entry<String, String> e : files.entrySet()) {
+			CompoundTag tag = new CompoundTag();
+			tag.putString("Name", e.getKey());
+			tag.putString("Source", e.getValue());
+			fileList.add(tag);
+		}
+		compound.put("Files", fileList);
+		compound.putBoolean("KeepLoaded", keepLoaded);
 		compound.putInt("Energy", energy.getEnergyStored());
 		if (!clientPacket)
 			compound.put("Disk", diskData);
 		if (clientPacket) {
 			compound.putString("State", displayState());
+			compound.putString("Error", runtime != null ? runtime.getError() : "");
 			ListTag lines = new ListTag();
 			for (String line : currentTerminal())
 				lines.add(StringTag.valueOf(line));
@@ -294,12 +387,25 @@ public class ComputerBlockEntity extends KineticBlockEntity implements MenuProvi
 	@Override
 	protected void read(CompoundTag compound, HolderLookup.Provider registries, boolean clientPacket) {
 		super.read(compound, registries, clientPacket);
-		programSource = compound.getString("ProgramSource");
+		LinkedHashMap<String, String> loaded = new LinkedHashMap<>();
+		if (compound.contains("Files", Tag.TAG_LIST)) {
+			ListTag fileList = compound.getList("Files", Tag.TAG_COMPOUND);
+			for (int i = 0; i < fileList.size(); i++) {
+				CompoundTag tag = fileList.getCompound(i);
+				loaded.put(tag.getString("Name"), tag.getString("Source"));
+			}
+		} else if (compound.contains("ProgramSource", Tag.TAG_STRING)) {
+			// Worlds from before the filesystem: the whole program becomes main.lua.
+			loaded.put(MAIN_FILE, compound.getString("ProgramSource"));
+		}
+		files = sanitize(loaded);
+		keepLoaded = compound.getBoolean("KeepLoaded");
 		energy.setStored(compound.getInt("Energy"));
 		if (!clientPacket)
 			diskData = compound.getCompound("Disk");
 		if (clientPacket) {
 			clientState = compound.getString("State");
+			clientError = compound.getString("Error");
 			clientTerminal.clear();
 			ListTag lines = compound.getList("Terminal", Tag.TAG_STRING);
 			for (int i = 0; i < lines.size(); i++)

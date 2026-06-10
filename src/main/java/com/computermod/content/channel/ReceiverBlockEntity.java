@@ -3,6 +3,9 @@ package com.computermod.content.channel;
 import java.util.List;
 
 import com.computermod.channel.ChannelBus;
+import com.computermod.channel.ChannelDirectory;
+import com.computermod.channel.ChannelEntry;
+import com.computermod.world.ChunkLoadManager;
 import com.simibubi.create.foundation.blockEntity.SmartBlockEntity;
 import com.simibubi.create.foundation.blockEntity.behaviour.BlockEntityBehaviour;
 
@@ -24,10 +27,19 @@ import org.jetbrains.annotations.Nullable;
  * Receiver / actuator: subscribes to a channel and emits redstone (0-15) on all sides based on the
  * latest value (number → clamped, boolean → 15/0, otherwise 0).
  */
-public class ReceiverBlockEntity extends SmartBlockEntity implements MenuProvider, ChannelConfigurable {
+public class ReceiverBlockEntity extends SmartBlockEntity
+	implements MenuProvider, ChannelConfigurable, ChunkLoadManager.KeepLoaded {
+
+	/** How often (in ticks) the value preview shown in the GUI may re-sync. */
+	private static final int PREVIEW_INTERVAL = 5;
 
 	private String channel = "";
 	private int output = 0;
+	/** Whether this receiver force-loads its chunks so it keeps emitting with no player nearby. */
+	private boolean keepLoaded = false;
+	/** Short text preview of the latest channel value, synced for the GUI. */
+	private String valuePreview = "";
+	private int previewTimer = 0;
 
 	public ReceiverBlockEntity(BlockEntityType<?> type, BlockPos pos, BlockState state) {
 		super(type, pos, state);
@@ -41,7 +53,21 @@ public class ReceiverBlockEntity extends SmartBlockEntity implements MenuProvide
 		super.tick();
 		if (level == null || level.isClientSide)
 			return;
-		int target = channel.isEmpty() ? 0 : toRedstone(ChannelBus.get().read(channel));
+		Object value = channel.isEmpty() ? null : ChannelBus.get().read(channel);
+		if (!channel.isEmpty())
+			ChannelDirectory.get().touch(channel, ChannelDirectory.Kind.RECEIVER, worldPosition, level.getGameTime());
+
+		// Keep the GUI's value preview fresh (throttled; it is a client packet).
+		if (++previewTimer >= PREVIEW_INTERVAL) {
+			previewTimer = 0;
+			String preview = ChannelEntry.preview(value);
+			if (!preview.equals(valuePreview)) {
+				valuePreview = preview;
+				sendData();
+			}
+		}
+
+		int target = channel.isEmpty() ? 0 : toRedstone(value);
 		if (target != output) {
 			output = target;
 			setChanged();
@@ -77,6 +103,34 @@ public class ReceiverBlockEntity extends SmartBlockEntity implements MenuProvide
 		return output;
 	}
 
+	/** Client-side: short preview of the latest value on the channel ("" when none). */
+	public String getValuePreview() {
+		return valuePreview;
+	}
+
+	@Override
+	public void destroy() {
+		ChannelDirectory.get().forget(worldPosition);
+		if (keepLoaded && level instanceof net.minecraft.server.level.ServerLevel serverLevel)
+			ChunkLoadManager.setForced(serverLevel, worldPosition, false);
+		super.destroy();
+	}
+
+	@Override
+	public boolean isKeepLoaded() {
+		return keepLoaded;
+	}
+
+	public void setKeepLoaded(boolean keep) {
+		if (keepLoaded == keep)
+			return;
+		keepLoaded = keep;
+		if (level instanceof net.minecraft.server.level.ServerLevel serverLevel)
+			ChunkLoadManager.setForced(serverLevel, worldPosition, keep);
+		setChanged();
+		sendData();
+	}
+
 	@Override
 	public String getChannelName() {
 		return channel;
@@ -84,6 +138,8 @@ public class ReceiverBlockEntity extends SmartBlockEntity implements MenuProvide
 
 	@Override
 	public void configure(String newChannel) {
+		if (!channel.isEmpty() && !channel.equals(newChannel))
+			ChannelDirectory.get().forget(worldPosition);
 		this.channel = newChannel == null ? "" : newChannel;
 		setChanged();
 		sendData();
@@ -105,6 +161,9 @@ public class ReceiverBlockEntity extends SmartBlockEntity implements MenuProvide
 		super.write(compound, registries, clientPacket);
 		compound.putString("Channel", channel);
 		compound.putInt("Output", output);
+		compound.putBoolean("KeepLoaded", keepLoaded);
+		if (clientPacket)
+			compound.putString("Preview", valuePreview);
 	}
 
 	@Override
@@ -112,5 +171,8 @@ public class ReceiverBlockEntity extends SmartBlockEntity implements MenuProvide
 		super.read(compound, registries, clientPacket);
 		channel = compound.getString("Channel");
 		output = compound.getInt("Output");
+		keepLoaded = compound.getBoolean("KeepLoaded");
+		if (clientPacket)
+			valuePreview = compound.getString("Preview");
 	}
 }

@@ -1,9 +1,9 @@
-# Computer Mod — Programming Guide (LLM context file)
+# Computer Mod, Programming Guide (LLM context file)
 
 > **How to use this file:** paste the whole thing into an LLM, then ask it to write a program
 > (e.g. "turn on a lamp when a tank is more than half full"). This document fully describes the
 > in-game computer, its Lua dialect, every available function, and how it talks to the world. The
-> LLM should ONLY use the functions and fields documented here — anything else does not exist.
+> LLM should ONLY use the functions and fields documented here; anything else does not exist.
 
 ---
 
@@ -13,32 +13,33 @@ The **Computer** is a pure "brain". It runs Lua, does math, stores data, knows i
 talks over **wireless channels**. It does **NOT** directly read or touch neighbouring blocks. All
 physical input and output happens through two other blocks:
 
-- **Sensor block** → reads a block it's attached to and **publishes** its readings on a channel.
+- **Sensor block** reads a block it is attached to and **publishes** its readings on a channel.
   (This is how the computer gets *input* from the world.)
-- **Receiver block** → reads a channel and **emits redstone**. (This is how the computer *acts* on
-  the world — drive machines, lamps, Create gearshifts, etc., with redstone.)
+- **Receiver block** reads a channel and **emits redstone**. (This is how the computer *acts* on
+  the world: drive machines, lamps, Create gearshifts, etc., with redstone.)
 
-So the data flow is: **world → Sensor → channel → Computer → channel → Receiver → world.**
+So the data flow is: **world -> Sensor -> channel -> Computer -> channel -> Receiver -> world.**
 Computers can also message each other directly over channels.
 
 ### Complete function index (every global on the computer)
 
 | Function | Returns | Purpose |
 |---|---|---|
-| `print(...)` | — | write a line to the computer's Console |
+| `print(...)` | none | write a line to the computer's Console |
 | `getLocation()` | `{x,y,z}` | this computer's own coordinates (GPS) |
-| `emit(channel, value)` | — | publish any value on a named channel |
+| `emit(channel, value)` | none | publish any value on a named channel |
 | `channel(name)` | value/nil | latest value on a channel |
 | `channels()` | table | array of active channel names |
-| `disk.set(key, value)` | — | persistent storage write (survives reboot) |
+| `disk.set(key, value)` | none | persistent storage write (survives reboot) |
 | `disk.get(key)` | value/nil | persistent storage read |
-| `disk.delete(key)` | — | remove a stored key |
+| `disk.delete(key)` | none | remove a stored key |
 | `disk.list()` | table | array of stored keys |
-| `disk.clear()` | — | wipe the disk |
-| `sleep(seconds)` | — | idle (use inside loops; min 0.05s) |
+| `disk.clear()` | none | wipe the disk |
+| `sleep(seconds)` | none | idle (use inside loops; min 0.05s) |
+| `require(name)` | module value | load another flashed file once, return its result |
 
 Plus the standard Lua 5.1 library (`math`, `string`, `table`, base functions, `os.time/clock/date`).
-There is **no** `scan`, `redstone`, `setOutput`, `moveItems`, etc. on the computer — that's the
+There is **no** `scan`, `redstone`, `setOutput`, `moveItems`, etc. on the computer; that is the
 Sensor/Receiver blocks' job.
 
 ---
@@ -47,37 +48,72 @@ Sensor/Receiver blocks' job.
 
 A microcontroller block for the Minecraft mod **Create** (NeoForge 1.21.1):
 
-- You **flash** it with a Lua program (stored permanently in the block).
-- When **powered**, it **boots** and runs the program from the top.
+- Its flash memory is a tiny **filesystem** of Lua files. `main.lua` always exists and is the entry
+  point; you can add up to 16 files in total. You **flash** the files onto the block (stored
+  permanently).
+- When **powered**, it **boots** and runs `main.lua` from the top.
 - When it loses power, it **halts** and variables (RAM) are wiped. Re-powering boots it fresh.
-- Power: a **cogwheel running horizontally through its centre** (like Create's Encased Cogwheel) — mesh
-  a cogwheel from the side or run a shaft into either end of its axis — and/or Forge Energy (FE).
-- The program runs **continuously on its own thread** — `while true do ... end` loops are fine.
+- Power: a **cogwheel running horizontally through its centre** (mesh a cogwheel from the side or
+  run a shaft into either end of its axis) and/or Forge Energy (FE) through the copper plate on top.
+- The program runs **continuously on its own thread**; `while true do ... end` loops are fine.
 - Run states (status bar): `OFF`, `RUNNING`, `FINISHED` (program returned), `ERROR` (crashed).
 
 ---
 
-## 2. The language
+## 2. Files and require
+
+A computer holds named files like a real microcontroller project. `main.lua` runs at boot. Every
+other file is a library that does nothing until loaded with `require`:
+
+- `require("pid")` runs the file `pid.lua` once and returns whatever that file returns. Later calls
+  return the same cached value without re-running it.
+- A library file conventionally builds a table of functions and ends with `return M`.
+- Requiring a missing file is an error (`module 'x' not found`). Circular requires are an error.
+  `require("main")` is an error (it is the entry point).
+- Errors include the file name: `pid.lua:4: attempt to compare nil`.
+
+```lua
+-- pid.lua
+local M = {}
+function M.clamp(v, lo, hi)
+  if v < lo then return lo end
+  if v > hi then return hi end
+  return v
+end
+return M
+```
+
+```lua
+-- main.lua
+local pid = require("pid")
+emit("motor", pid.clamp(channel("throttle") or 0, 0, 10))
+```
+
+Single-file programs are fine too: just write everything in `main.lua` and never call `require`.
+
+---
+
+## 3. The language
 
 **Lua 5.1** (via LuaJ) in a sandbox.
 
 Available: base functions (`print`, `type`, `tostring`, `tonumber`, `pairs`, `ipairs`, `select`,
-`error`, `assert`, `pcall`, `setmetatable`, `#`, …), `math.*`, `string.*`, `table.*`, and
-`os.time/os.clock/os.date`.
+`error`, `assert`, `pcall`, `setmetatable`, `#`, ...), `math.*`, `string.*`, `table.*`,
+`os.time/os.clock/os.date`, and `require` for the computer's own files.
 
-NOT available (sandbox): `io`, files, `os.execute/exit`, `require`, `package`, `load`/`loadstring`,
-`debug`, `collectgarbage`, Java access. Don't use these.
+NOT available (sandbox): `io`, file access outside the flash, `os.execute/exit`, `package`,
+`load`/`loadstring`, `dofile`, `loadfile`, `debug`, `collectgarbage`, Java access. Don't use these.
 
 Lua reminders: tables are 1-indexed; `..` concatenates; only `nil`/`false` are falsey (`0` is true);
 use `local`.
 
 ---
 
-## 3. Execution & performance
+## 4. Execution & performance
 
 - The program runs on a worker thread at a **clock speed** (~4M Lua instructions/sec, configurable).
   Pure computation runs at full speed.
-- **Instant:** `print`, `getLocation`, `emit`, `channel`, `channels`, and all pure Lua.
+- **Instant:** `print`, `getLocation`, `emit`, `channel`, `channels`, `require`, and all pure Lua.
 - **~1 game tick each:** the `disk.*` functions (they touch saved data on the server thread).
 - `sleep(seconds)` pauses without using clock budget; the minimum is one tick (0.05s). Put a `sleep`
   in every forever-loop so it paces itself:
@@ -91,45 +127,50 @@ use `local`.
 
 ---
 
-## 4. API reference
+## 5. API reference
 
 ### Output
-- `print(...)` — write a line to the Console tab. Multiple args allowed.
+- `print(...)`: write a line to the Console tab. Multiple args allowed.
 
 ### Location (built-in GPS)
-- `getLocation()` → `{ x=, y=, z= }`, this computer's world coordinates. Stationary computers report
+- `getLocation()` -> `{ x=, y=, z= }`, this computer's world coordinates. Stationary computers report
   a fixed position; broadcast it on a channel so others can navigate to it.
 
-### Wireless channels — the computer's I/O
-- `emit(channelName, value)` — publish a value (number, string, boolean, or table) on a named
-  channel. This is how a computer drives Receivers and messages other computers.
-- `channel(channelName)` → the latest value on that channel, or `nil` if none. The value's type is
-  whatever was published (often a table from a Sensor — see §5).
-- `channels()` → array (table) of all active channel names.
+### Wireless channels, the computer's I/O
+- `emit(channelName, value)`: publish a value (number, string, boolean, or table) on a named
+  channel. This is how a computer drives Receivers and messages other computers. Emitting `nil`
+  clears the channel.
+- `channel(channelName)` -> the latest value on that channel, or `nil` if none. The value's type is
+  whatever was published (often a table from a Sensor; see section 6).
+- `channels()` -> array (table) of all active channel names.
 
-### Persistent storage (disk / EEPROM) — survives reboot, power loss, world reload
-- `disk.set(key, value)` — store a value (number/string/boolean/table). `nil` deletes the key.
-- `disk.get(key)` → the stored value, or `nil`.
-- `disk.delete(key)` — remove a key.
-- `disk.list()` → array of stored key names.
-- `disk.clear()` — wipe the disk.
+### Persistent storage (disk / EEPROM), survives reboot, power loss, world reload
+- `disk.set(key, value)`: store a value (number/string/boolean/table). `nil` deletes the key.
+- `disk.get(key)` -> the stored value, or `nil`.
+- `disk.delete(key)`: remove a key.
+- `disk.list()` -> array of stored key names.
+- `disk.clear()`: wipe the disk.
 ```lua
 local boots = disk.get("boots") or 0
 disk.set("boots", boots + 1)
 print("booted " .. (boots + 1) .. " times")   -- counts up across reboots
 ```
 
+### Modules
+- `require(name)` -> load the flashed file `name.lua` once, return its result (see section 2).
+
 ### Timing
-- `sleep(seconds)` — idle (fractions allowed; minimum one tick = 0.05s).
+- `sleep(seconds)`: idle (fractions allowed; minimum one tick = 0.05s).
 
 ---
 
-## 5. Sensor readings (the data a Sensor publishes)
+## 6. Sensor readings (the data a Sensor publishes)
 
-A **Sensor** reads the block it faces and publishes a **table** of all its readings. The computer
-receives that table via `channel(name)`. **Which keys exist depends on the block** — always guard
-with `if t.field then ... end`. The Sensor's GUI shows, live, exactly what it currently sees as a
-collapsible tree — click a `▸` row (e.g. `state`, `items`, `nbt`) to drill into its nested fields.
+A **Sensor** reads the block it is attached to and publishes a **table** of all its readings. The
+computer receives that table via `channel(name)`. **Which keys exist depends on the block**; always
+guard with `if t.field then ... end`. The Sensor's GUI shows, live, exactly what it currently sees as
+a searchable tree, and clicking any value copies the exact Lua expression that reads it (e.g.
+`channel("tank").tanks[1].amount`), so the user can paste exact field paths into the chat.
 
 | Field | Type | Meaning |
 |---|---|---|
@@ -145,8 +186,8 @@ collapsible tree — click a `▸` row (e.g. `state`, `items`, `nbt`) to drill i
 | `tanks` | array | `{ fluid="<id>", amount=<mB>, capacity }` per tank |
 | `energy` / `energy_capacity` | number | stored / max Forge Energy |
 | `state` | table | blockstate properties, e.g. `state.powered`, `state.facing` |
-| `analog_output` | number | comparator output 0–15 (e.g. container fullness) |
-| `nbt` | table | the block's full saved data — exposes anything an addon stores even with no labelled field. Explore with `pairs`. |
+| `analog_output` | number | comparator output 0-15 (e.g. container fullness) |
+| `nbt` | table | the block's full saved data; exposes anything an addon stores even with no labelled field. Explore with `pairs`. |
 
 ```lua
 -- a Sensor is publishing the whole table on channel "tank"
@@ -158,21 +199,18 @@ end
 
 ---
 
-## 6. Channels, Sensor & Receiver in detail
+## 7. Channels, Sensor & Receiver in detail
 
 ### Channel bus
 Server-wide named mailboxes carrying **rich values** (numbers/strings/booleans/tables). Computers,
-Sensors and Receivers all share it. `emit` to write, `channel(name)` to read latest.
+Sensors, Receivers and the player's Controller item all share it. `emit` to write, `channel(name)`
+to read latest. Only the latest value is kept; there is no queue.
 
 ### Sensor block (input)
-Place it **facing a block** (placed against the block you want to read). Right-click to set the
-**Channel** it publishes on. It always publishes the **whole readings table**, so `channel("c")` is
-a table — index into it (e.g. `channel("c").item_count`). The GUI lists every field it currently
-sees with its live value, so you know exactly what's available before writing code.
-
-It transmits **immediately, the same tick the block changes** (an item added, a fluid level moved, a
-state flipped) — there is no polling delay. If nothing changed it stays quiet and the channel keeps
-its latest value.
+Placed against the block to read. Right-click to set the **Channel** it publishes on. It always
+publishes the **whole readings table**, so `channel("c")` is a table; index into it (e.g.
+`channel("c").item_count`). It transmits **immediately, the same tick the block changes**; there is
+no polling delay. If nothing changed it stays quiet and the channel keeps its latest value.
 
 > To turn a sensor reading into redstone, read it in the computer, decide, and `emit` a number/bool
 > on another channel that a **Receiver** listens to. Wiring a Receiver straight to a sensor channel
@@ -180,19 +218,23 @@ its latest value.
 
 ### Receiver block (output)
 Right-click to set a **Channel**. It emits redstone on all sides from the latest value:
-number → clamped 0–15, `true` → 15, `false`/`nil` → 0.
+number -> clamped 0-15, `true` -> 15, `false`/`nil` -> 0.
 ```lua
 emit("pump", true)   -- receiver outputs 15
 emit("pump", 7)      -- receiver outputs 7
 emit("pump", false)  -- receiver outputs 0
 ```
 
-> For plain 0–15 wireless redstone you can also use Create's own **Redstone Link** — it's separate
+### Controller item (player input)
+The player can bind keys/mouse/scroll to channels and publish `true`/`false` (toggle or hold modes)
+or a number (analog scroll mode). Programs read those with `channel(name)` like any other value.
+
+> For plain 0-15 wireless redstone you can also use Create's own **Redstone Link**; it is separate
 > from this system. Our channels are for rich data and computer logic.
 
 ---
 
-## 7. Patterns
+## 8. Patterns
 
 **Read a sensor, drive a receiver (the standard control loop):**
 ```lua
@@ -260,14 +302,36 @@ local s = channel("status")
 if s and s.online then print("A has " .. s.items .. " items") end
 ```
 
+**A shared library file (multi-file program):**
+```lua
+-- util.lua
+local M = {}
+function M.tankPercent(t)
+  local tk = t and t.tanks and t.tanks[1]
+  if not tk or tk.capacity == 0 then return 0 end
+  return tk.amount / tk.capacity * 100
+end
+return M
+```
+```lua
+-- main.lua
+local util = require("util")
+while true do
+  emit("valve", util.tankPercent(channel("boiler")) < 20)
+  sleep(0.5)
+end
+```
+
 ---
 
-## 8. Errors & debugging
+## 9. Errors & debugging
 
-- A crash sets state `ERROR` and prints `error: computer:<line> <message>` to the Console.
+- A crash sets state `ERROR` and prints `error: <file>:<line>: <message>` to the Console, e.g.
+  `error: main.lua:7: attempt to index a nil value`. The file name tells you which file to open.
 - Common causes:
-  - Indexing nil: `t.foo.bar` when `t.foo` is nil → guard with `if t.foo then`.
-  - Concatenating nil: `"x=" .. t.foo` when nil → use `tostring(t.foo)`.
+  - Indexing nil: `t.foo.bar` when `t.foo` is nil; guard with `if t.foo then`.
+  - Concatenating nil: `"x=" .. t.foo` when nil; use `tostring(t.foo)`.
+  - `module 'x' not found`: `require("x")` but no file `x.lua` is flashed on this computer.
 - `print` liberally and watch the Console. Wrap risky code in `pcall`:
   ```lua
   local ok, err = pcall(function() ... end)
@@ -276,20 +340,21 @@ if s and s.online then print("A has " .. s.items .. " items") end
 
 ---
 
-## 9. FAQ / gotchas
+## 10. FAQ / gotchas
 
 - The computer **cannot** read or output to adjacent blocks directly. Use a **Sensor** for input and
   a **Receiver** for output, connected by channels.
-- Sensor readings differ per block — **check fields exist** before using them.
+- Sensor readings differ per block; **check fields exist** before using them.
 - A Sensor always publishes the whole table; `channel(name)` from a sensor is always a table.
 - `0` is truthy in Lua; only `nil`/`false` are falsey.
 - Variables reset on power loss (RAM); use `disk` for data that must persist; code persists (flash).
+- Each computer has its own files; `require` only sees files flashed onto that computer.
 - Put `sleep` in every forever-loop.
 - A program with no loop runs once and stops (`FINISHED`).
 
 ---
 
-## 10. Complete worked example — wireless auto-restocker
+## 11. Complete worked example, wireless auto-restocker
 
 Sensor on a chest publishes its readings on channel `stock`. The computer turns on a wireless signal
 when the chest is low; a Receiver on channel `refill` drives a machine.
@@ -300,10 +365,10 @@ while true do
   local s = channel("stock")             -- whole readings table from the sensor
   local count = (s and s.item_count) or 0
   if count < 10 then
-    emit("refill", 15)                   -- low → signal on
+    emit("refill", 15)                   -- low -> signal on
     print("LOW (" .. count .. ") refilling")
   else
-    emit("refill", 0)                    -- enough → signal off
+    emit("refill", 0)                    -- enough -> signal off
   end
   sleep(0.5)
 end
@@ -320,8 +385,10 @@ channel(name)                    -> latest value or nil
 channels()                       -> array of active channel names
 disk.set(key,value) disk.get(key) disk.delete(key) disk.list() disk.clear()
 sleep(seconds)                   idle (min 0.05s)
+require(name)                    load flashed file "name.lua" once
 
-Sensor block  = input  (reads a block -> publishes on a channel)
-Receiver block = output (channel value -> redstone)
+Files: main.lua runs at boot; other files are libraries for require()
+Sensor block   = input  (reads a block -> publishes its table on a channel)
+Receiver block = output (channel value -> redstone 0-15)
 Computer talks ONLY via channels, disk, print, getLocation.
 ```

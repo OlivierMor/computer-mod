@@ -107,7 +107,7 @@ public final class ComputerApi {
 			}
 		});
 
-		ChannelApi.install(globals, runtime, level);
+		ChannelApi.install(globals, runtime, level, be.getBlockPos());
 	}
 
 	private ComputerApi() {}

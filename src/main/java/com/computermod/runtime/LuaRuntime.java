@@ -3,8 +3,12 @@ package com.computermod.runtime;
 import java.io.OutputStream;
 import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Deque;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.CountDownLatch;
 import java.util.function.Consumer;
@@ -13,6 +17,7 @@ import java.util.function.Supplier;
 import org.luaj.vm2.Globals;
 import org.luaj.vm2.LuaError;
 import org.luaj.vm2.LuaValue;
+import org.luaj.vm2.lib.OneArgFunction;
 import org.luaj.vm2.lib.jse.JsePlatform;
 
 /**
@@ -46,7 +51,10 @@ public class LuaRuntime {
 
 	private Thread worker;
 	private volatile boolean alive;
-	private String source;
+	/** The flashed files; {@value #MAIN_FILE} is the entry point, the rest load via require(). */
+	private Map<String, String> files;
+
+	public static final String MAIN_FILE = "main.lua";
 
 	// Clock throttle (worker waits, main grants).
 	private final Object clockLock = new Object();
@@ -82,13 +90,21 @@ public class LuaRuntime {
 		return terminalRevision;
 	}
 
+	/** Wipe the terminal buffer (the program keeps running). */
+	public void clearTerminal() {
+		synchronized (terminal) {
+			terminal.clear();
+			terminalRevision++;
+		}
+	}
+
 	public void setApiInstaller(Consumer<Globals> installer) {
 		this.apiInstaller = installer;
 	}
 
 	/** Boot: launch the worker thread. Call on the server thread. */
-	public void start(String source) {
-		this.source = source;
+	public void start(Map<String, String> files) {
+		this.files = files;
 		this.alive = true;
 		this.sliceGranted = false;
 		this.state = State.RUNNING;
@@ -129,7 +145,11 @@ public class LuaRuntime {
 	private void runProgram() {
 		try {
 			Globals globals = createSandbox();
-			LuaValue chunk = globals.load(source, "computer", globals);
+			String main = files.get(MAIN_FILE);
+			if (main == null)
+				throw new LuaError("no " + MAIN_FILE + " — flash a program first");
+			// The chunk name is the file name, so errors read "main.lua:12: ...".
+			LuaValue chunk = globals.load(main, MAIN_FILE, globals);
 			chunk.call();
 			if (alive)
 				state = State.FINISHED;
@@ -196,13 +216,45 @@ public class LuaRuntime {
 		g.set("luajava", LuaValue.NIL);
 		g.set("io", LuaValue.NIL);
 		g.set("debug", LuaValue.NIL);
-		g.set("require", LuaValue.NIL);
 		g.set("package", LuaValue.NIL);
 		g.set("dofile", LuaValue.NIL);
 		g.set("loadfile", LuaValue.NIL);
 		g.set("load", LuaValue.NIL);
 		g.set("loadstring", LuaValue.NIL);
 		g.set("collectgarbage", LuaValue.NIL);
+
+		// require("name"): load a sibling flash file, like Lua's module system. Each file runs once;
+		// its return value is cached and handed back on every later require. Cycles are an error.
+		Map<String, LuaValue> moduleCache = new HashMap<>();
+		Deque<String> loading = new ArrayDeque<>();
+		g.set("require", new OneArgFunction() {
+			@Override
+			public LuaValue call(LuaValue arg) {
+				String name = arg.checkjstring();
+				String fileName = name.endsWith(".lua") ? name : name + ".lua";
+				if (fileName.equals(MAIN_FILE))
+					throw new LuaError("cannot require '" + MAIN_FILE + "' (it is the entry point)");
+				String source = files.get(fileName);
+				if (source == null)
+					throw new LuaError("module '" + name + "' not found: no file '" + fileName + "'");
+				LuaValue cached = moduleCache.get(fileName);
+				if (cached != null)
+					return cached;
+				if (loading.contains(fileName))
+					throw new LuaError("circular require: " + String.join(" -> ", loading) + " -> " + fileName);
+				loading.push(fileName);
+				try {
+					LuaValue result = g.load(source, fileName, g).call();
+					// Lua convention: a module that returns nothing still counts as loaded (true).
+					if (result.isnil())
+						result = LuaValue.TRUE;
+					moduleCache.put(fileName, result);
+					return result;
+				} finally {
+					loading.pop();
+				}
+			}
+		});
 
 		LuaValue os = g.get("os");
 		if (os.istable()) {

@@ -1,6 +1,6 @@
 {
   "variants": {
-    "axis=x": { "model": "computermod:block/computer", "x": 90, "y": 90 },
-    "axis=z": { "model": "computermod:block/computer", "x": 90, "y": 180 }
+    "axis=x": { "model": "computermod:block/computer", "uvlock": true, "x": 90, "y": 90 },
+    "axis=z": { "model": "computermod:block/computer", "uvlock": true, "x": 90, "y": 180 }
   }
 }

@@ -2,7 +2,6 @@ package com.computermod.content.computer;
 
 import com.computermod.registry.ModBlockEntities;
 import com.simibubi.create.content.kinetics.base.HorizontalAxisKineticBlock;
-import com.simibubi.create.content.kinetics.simpleRelays.ICogWheel;
 import com.simibubi.create.foundation.block.IBE;
 
 import net.minecraft.core.Direction.Axis;
@@ -18,13 +17,13 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.BlockHitResult;
 
 /**
- * The programmable computer block. It is a Create kinetic machine driven by a cogwheel that runs
- * horizontally through its centre: the block itself acts as a small cogwheel ({@link ICogWheel})
- * on a horizontal axis, so it meshes with an adjacent cogwheel or accepts a coaxial shaft, exactly
- * like Create's Encased Cogwheel. It draws Stress from the network while running. The attached
- * {@link ComputerBlockEntity} hosts the script runtime.
+ * The programmable computer block. It is a Create kinetic machine driven by a shaft that runs
+ * horizontally through its centre, exactly like Create's Brass Encased Shaft: the recessed
+ * openings on the two axis faces accept a coaxial shaft connection from either side. It draws
+ * Stress from the network while running. The attached {@link ComputerBlockEntity} hosts the
+ * script runtime.
  */
-public class ComputerBlock extends HorizontalAxisKineticBlock implements IBE<ComputerBlockEntity>, ICogWheel {
+public class ComputerBlock extends HorizontalAxisKineticBlock implements IBE<ComputerBlockEntity> {
 
 	public ComputerBlock(Properties properties) {
 		super(properties);
@@ -36,9 +35,8 @@ public class ComputerBlock extends HorizontalAxisKineticBlock implements IBE<Com
 		Axis preferred = getPreferredHorizontalAxis(context);
 		if (preferred != null)
 			return defaultBlockState().setValue(HORIZONTAL_AXIS, preferred);
-		// ...otherwise put the cog's axle along the player's facing, so the flat face points at them
-		// and the cogwheel runs side-to-side through the block (like a Mechanical Crafter), rather
-		// than the axle pointing across their view with the cog facing them.
+		// ...otherwise run the shaft along the player's facing, so the screen face points at them
+		// and the shaft ports face away to the sides, rather than a port staring at the player.
 		return defaultBlockState().setValue(HORIZONTAL_AXIS, context.getHorizontalDirection().getAxis());
 	}
 

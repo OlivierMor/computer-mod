@@ -226,6 +226,8 @@ public class ControllerConfigScreen extends Screen {
 			onClose();
 			return true;
 		}
+		if (suggestions != null && suggestions.keyPressed(keyCode))
+			return true;
 		if (getFocused() != null && getFocused().keyPressed(keyCode, scanCode, modifiers))
 			return true;
 		return keyCode == GLFW.GLFW_KEY_TAB && super.keyPressed(keyCode, scanCode, modifiers);
