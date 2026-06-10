@@ -143,11 +143,23 @@ what you want in plain English to an AI like ChatGPT or Claude, paste in the pro
 it. See [Coding with AI](#coding-with-ai). If you do want to learn, [Lua Basics](#lua-basics) starts
 from zero.
 
+For the best experience we recommend playing with Create, this mod, and the **Aeronautics** addon
+together: Aeronautics adds real flying machines, and this mod gives them a brain, which is what makes
+autonomous aircraft possible. It is a recommendation, not a requirement. Every other Create addon
+works with this mod too, because the Sensor reads addon blocks generically, as the
+"Works with other mods" section below explains.
+
 ## What you can build
 
+- **Autonomous planes with Aeronautics.** A computer reads the aircraft's instruments, holds altitude
+  and heading, follows a route between airport beacons, and lands while you sit back. Airports
+  broadcast their coordinates over channels; every plane in the sky can navigate to them.
+- **With just Create:** a factory that watches its own stock and switches production lines on and off,
+  a self-refilling farm, a train depot that reports what every station is doing, an overstress alarm
+  that flashes before your network grinds to a halt.
 - An alarm that flashes a lamp when a chest is nearly full or a tank runs low.
-- A farm or factory that turns machines on and off based on how much they have produced.
-- A smart vehicle or contraption you steer with the keyboard, like a plane, train, or rover.
+- A smart vehicle or contraption you steer with the keyboard, like a plane, train, or rover, with the
+  computer enforcing speed limits and safety cut-offs while you drive.
 - A dashboard where one computer collects readings from many machines and reports a summary.
 - A network of computers spread across your base that message each other.
 
@@ -172,7 +184,9 @@ because understanding the model makes everything else obvious.
 The Sensor reads blocks generically, with no mod-specific code. It pulls standard NeoForge data (item
 inventories, fluid tanks, Forge Energy), every blockstate property, and the block's full saved data
 (NBT). Because almost every modded machine stores its state in NBT, you can read practically any block
-from any mod, even one with no documented API. See [Reading Any Mod or Addon](#reading-any-mod-or-addon).
+from any mod, even one with no documented API. That is why Aeronautics, our recommended companion, and
+every other Create addon work with this mod out of the box. See
+[Reading Any Mod or Addon](#reading-any-mod-or-addon).
 
 ## Keeps running while you are away
 
